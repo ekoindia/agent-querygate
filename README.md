@@ -1,4 +1,4 @@
-# Eko MySQL Agent Connector Service
+# Agent QueryGate
 
 A security broker between AI agents and MySQL databases. Provides policy-based guardrails, audit logging, and a REST API with MCP wrapper so AI agents can query and modify MySQL safely.
 
@@ -34,8 +34,8 @@ A security broker between AI agents and MySQL databases. Provides policy-based g
 
 ```bash
 # 1. Clone and install dependencies
-git clone https://github.com/anthropics/eko-mysql-agent-connector-service.git
-cd eko-mysql-agent-connector-service
+git clone https://github.com/anthropics/agent-querygate.git
+cd agent-querygate
 npm install && cd frontend && npm install && cd ..
 
 # 2. Configure environment
@@ -43,7 +43,7 @@ cp .env.example .env
 # Edit .env -- set JWT_SECRET and ENCRYPTION_KEY to secure random values
 
 # 3. Create the admin database
-mysql -u root -e "CREATE DATABASE eko_connector_admin"
+mysql -u root -e "CREATE DATABASE querygate_admin"
 
 # 4. Run migrations
 npm run db:migrate
@@ -108,7 +108,7 @@ Open **http://localhost:5173/setup** to create the initial superadmin account.
 ## Project Structure
 
 ```
-eko-mysql-agent-connector-service/
+agent-querygate/
 +-- src/
 |   +-- index.ts                 # Hono server entry point
 |   +-- config.ts                # Env config with Zod validation
@@ -203,12 +203,12 @@ Add to your `claude_desktop_config.json`:
 ```json
 {
 	"mcpServers": {
-		"eko-mysql": {
+		"agent-querygate": {
 			"command": "node",
-			"args": ["path/to/eko-mysql-agent-connector-service/dist/mcp/server.js"],
+			"args": ["path/to/agent-querygate/dist/mcp/server.js"],
 			"env": {
-				"EKO_BASE_URL": "http://localhost:3000",
-				"EKO_API_KEY": "your-agent-api-key"
+				"AQG_BASE_URL": "http://localhost:3000",
+				"AQG_API_KEY": "your-agent-api-key"
 			}
 		}
 	}
@@ -237,7 +237,7 @@ Add to your `claude_desktop_config.json`:
 |--------------------|----------------------------------------|------------------------|
 | `ADMIN_DB_HOST`    | Admin database host                    | `localhost`            |
 | `ADMIN_DB_PORT`    | Admin database port                    | `3306`                 |
-| `ADMIN_DB_NAME`    | Admin database name                    | `eko_connector_admin`  |
+| `ADMIN_DB_NAME`    | Admin database name                    | `querygate_admin`  |
 | `ADMIN_DB_USER`    | Admin database user                    | `root`                 |
 | `ADMIN_DB_PASSWORD`| Admin database password                | (empty)                |
 | `JWT_SECRET`       | Secret for signing JWTs (min 16 chars) | **required**           |

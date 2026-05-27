@@ -1,14 +1,14 @@
 # MCP Integration
 
-The Eko MySQL Agent Connector provides a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that exposes the Agent API as tools. This allows AI assistants like Claude to interact with MySQL databases using natural language, with all queries governed by the policy engine.
+The Agent QueryGate provides a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that exposes the Agent API as tools. This allows AI assistants like Claude to interact with MySQL databases using natural language, with all queries governed by the policy engine.
 
 ## How It Works
 
-MCP is a standard protocol for connecting AI models to external tools and data sources. The Eko MCP server:
+MCP is a standard protocol for connecting AI models to external tools and data sources. The QueryGate MCP server:
 
 1. Runs as a stdio subprocess alongside the AI assistant
 2. Receives tool calls from the assistant
-3. Translates them into HTTP requests to the Eko connector REST API
+3. Translates them into HTTP requests to the QueryGate REST API
 4. Returns structured results back to the assistant
 
 The MCP server itself is stateless -- it delegates all authentication, authorization, policy enforcement, and query execution to the main service.
@@ -112,31 +112,31 @@ Add the following to your Claude Desktop MCP configuration file (`claude_desktop
 ```json
 {
 	"mcpServers": {
-		"eko-mysql": {
+		"agent-querygate": {
 			"command": "npx",
 			"args": ["tsx", "src/mcp/server.ts"],
 			"env": {
-				"EKO_BASE_URL": "http://localhost:3000",
-				"EKO_API_KEY": "eko_your-api-key-here"
+				"AQG_BASE_URL": "http://localhost:3000",
+				"AQG_API_KEY": "aqg_your-api-key-here"
 			}
 		}
 	}
 }
 ```
 
-Replace the `EKO_API_KEY` value with the actual API key generated when you created the agent in the admin panel.
+Replace the `AQG_API_KEY` value with the actual API key generated when you created the agent in the admin panel.
 
 If the service is installed globally or you have it in a specific path, use the full path:
 
 ```json
 {
 	"mcpServers": {
-		"eko-mysql": {
+		"agent-querygate": {
 			"command": "npx",
-			"args": ["tsx", "/path/to/eko-mysql-agent-connector-service/src/mcp/server.ts"],
+			"args": ["tsx", "/path/to/agent-querygate/src/mcp/server.ts"],
 			"env": {
-				"EKO_BASE_URL": "http://localhost:3000",
-				"EKO_API_KEY": "eko_your-api-key-here"
+				"AQG_BASE_URL": "http://localhost:3000",
+				"AQG_API_KEY": "aqg_your-api-key-here"
 			}
 		}
 	}
@@ -150,12 +150,12 @@ For Claude Code, add the MCP server to your project's `.claude/settings.json` or
 ```json
 {
 	"mcpServers": {
-		"eko-mysql": {
+		"agent-querygate": {
 			"command": "npx",
-			"args": ["tsx", "/path/to/eko-mysql-agent-connector-service/src/mcp/server.ts"],
+			"args": ["tsx", "/path/to/agent-querygate/src/mcp/server.ts"],
 			"env": {
-				"EKO_BASE_URL": "http://localhost:3000",
-				"EKO_API_KEY": "eko_your-api-key-here"
+				"AQG_BASE_URL": "http://localhost:3000",
+				"AQG_API_KEY": "aqg_your-api-key-here"
 			}
 		}
 	}

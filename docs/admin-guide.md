@@ -1,6 +1,6 @@
 # Admin Guide
 
-This guide covers day-to-day administration of the Eko MySQL Agent Connector Service through the web-based admin panel.
+This guide covers day-to-day administration of the Agent QueryGate through the web-based admin panel.
 
 ## First-Time Setup
 
@@ -78,7 +78,7 @@ Agents represent AI assistants or automated systems that interact with your data
 
 ### API Key Lifecycle
 
-- **Generation:** A new key is created with the `eko_` prefix followed by 32 random bytes (base64url-encoded).
+- **Generation:** A new key is created with the `aqg_` prefix followed by 32 random bytes (base64url-encoded).
 - **Storage:** Only the SHA-256 hash is stored. The plaintext key cannot be recovered.
 - **Rotation:** Use **Regenerate Key** to generate a new key. The old key is invalidated immediately.
 - **Revocation:** Deactivate the agent (set `isActive` to false) to revoke all access without deleting the agent record.

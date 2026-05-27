@@ -1,6 +1,6 @@
 # Development
 
-This guide covers the development workflow, project structure, testing, and conventions for contributing to the Eko MySQL Agent Connector Service.
+This guide covers the development workflow, project structure, testing, and conventions for contributing to the Agent QueryGate.
 
 ## Dev Environment Setup
 
@@ -24,7 +24,7 @@ cp .env.example .env
 # Edit .env with your local database credentials and secrets
 
 # Create the admin database
-mysql -u root -e "CREATE DATABASE IF NOT EXISTS eko_connector_admin;"
+mysql -u root -e "CREATE DATABASE IF NOT EXISTS querygate_admin;"
 
 # Run migrations
 npm run db:migrate
@@ -47,7 +47,7 @@ The backend runs on port 3000. The frontend dev server (Vite) runs on port 5173 
 ## Project Structure
 
 ```
-eko-mysql-agent-connector-service/
+agent-querygate/
 +-- src/
 |   +-- index.ts              # Application entry point, route mounting
 |   +-- config.ts             # Environment variable loading and validation

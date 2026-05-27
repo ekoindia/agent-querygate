@@ -70,7 +70,7 @@ async function callApi(
  */
 export function createMcpServer(baseUrl: string, apiKey: string): McpServer {
 	const server = new McpServer({
-		name: "eko-mysql-agent-connector",
+		name: "agent-querygate",
 		version: "0.1.0",
 	});
 

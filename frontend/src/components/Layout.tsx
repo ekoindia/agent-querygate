@@ -72,10 +72,10 @@ export function Layout() {
 				</div>
 				<div className="flex flex-col">
 					<span className="text-sm font-semibold leading-tight text-sidebar-foreground">
-						Eko MySQL
+						Agent
 					</span>
 					<span className="text-[10px] leading-tight text-sidebar-foreground/50">
-						Agent Connector
+						QueryGate
 					</span>
 				</div>
 			</div>

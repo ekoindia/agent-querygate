@@ -1,12 +1,12 @@
 # Architecture
 
-This document describes the system architecture, request flows, data model, and component breakdown of the Eko MySQL Agent Connector Service.
+This document describes the system architecture, request flows, data model, and component breakdown of the Agent QueryGate.
 
 ## System Architecture
 
 ```
 +---------------------------+         +----------------------------------+
-|     Clients               |         |     Eko Connector Service        |
+|     Clients               |         |     QueryGate Service        |
 |                           |         |                                  |
 |  +-------------------+    |  HTTP   |  +----------------------------+  |
 |  | Admin Browser UI  +----+-------->|  | Hono HTTP Server           |  |
@@ -46,7 +46,7 @@ This document describes the system architecture, request flows, data model, and 
                               v                                         v
                     +-------------------+                    +-------------------+
                     | Admin Database    |                    | Target Database(s)|
-                    | (eko_connector_   |                    | (user MySQL DBs)  |
+                    | (querygate_   |                    | (user MySQL DBs)  |
                     |  admin)           |                    |                   |
                     | - users           |                    | Managed via       |
                     | - databases       |                    | connection pools  |
@@ -66,7 +66,7 @@ Step-by-step flow when an AI agent executes a SELECT query:
 Agent                    Service                          Target DB
   |                        |                                 |
   |-- POST /api/v1/query ->|                                 |
-  |   X-API-Key: eko_...   |                                 |
+  |   X-API-Key: aqg_...   |                                 |
   |   {sql, database_id}   |                                 |
   |                        |                                 |
   |                        |-- 1. agentAuth middleware        |
@@ -298,7 +298,7 @@ Writes structured audit log entries to the admin database:
 ### Auth Layer (`src/auth/`)
 
 - `jwt.ts` -- sign and verify JWTs with `jsonwebtoken`
-- `api-key.ts` -- generate (`eko_` + 32 random bytes), hash (SHA-256), verify
+- `api-key.ts` -- generate (`aqg_` + 32 random bytes), hash (SHA-256), verify
 - `password.ts` -- bcrypt hash (12 rounds) and verify
 - `middleware.ts` -- Hono middleware: `adminAuth`, `adminOnlyAuth`, `agentAuth`
 

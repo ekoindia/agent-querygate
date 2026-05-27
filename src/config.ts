@@ -4,7 +4,7 @@ const configSchema = z.object({
 	adminDb: z.object({
 		host: z.string().default("localhost"),
 		port: z.coerce.number().default(3306),
-		name: z.string().default("eko_connector_admin"),
+		name: z.string().default("querygate_admin"),
 		user: z.string().default("root"),
 		password: z.string().default(""),
 	}),

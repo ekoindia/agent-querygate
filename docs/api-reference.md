@@ -5,7 +5,7 @@ All endpoints are served from a single Hono application. Admin routes are prefix
 ## Authentication Methods
 
 - **JWT Cookie** -- Admin endpoints use an `httpOnly` cookie named `token` containing a signed JWT. Obtained via login or setup.
-- **API Key** -- Agent endpoints authenticate via the `X-API-Key` header containing an `eko_`-prefixed key.
+- **API Key** -- Agent endpoints authenticate via the `X-API-Key` header containing an `aqg_`-prefixed key.
 - **Public** -- A few endpoints require no authentication (setup status, setup, login).
 
 ## Error Response Format
@@ -431,7 +431,7 @@ Create a new agent. Returns the API key -- this is the only time it is shown in 
 		"name": "string",
 		"isActive": true
 	},
-	"apiKey": "eko_base64url-encoded-random-key"
+	"apiKey": "aqg_base64url-encoded-random-key"
 }
 ```
 
@@ -483,7 +483,7 @@ Generate a new API key for an agent (invalidates the old key immediately).
 - **Response:**
 ```json
 {
-	"apiKey": "eko_new-base64url-encoded-random-key"
+	"apiKey": "aqg_new-base64url-encoded-random-key"
 }
 ```
 
@@ -795,7 +795,7 @@ Execute a read-only SQL query (SELECT only).
 ```bash
 curl -X POST http://localhost:3000/api/v1/query \
 	-H "Content-Type: application/json" \
-	-H "X-API-Key: eko_your-api-key-here" \
+	-H "X-API-Key: aqg_your-api-key-here" \
 	-d '{"sql":"SELECT id, status FROM orders LIMIT 5"}'
 ```
 
@@ -828,7 +828,7 @@ Execute a write SQL statement (INSERT, UPDATE, DELETE). Returns before/after sna
 ```bash
 curl -X POST http://localhost:3000/api/v1/execute \
 	-H "Content-Type: application/json" \
-	-H "X-API-Key: eko_your-api-key-here" \
+	-H "X-API-Key: aqg_your-api-key-here" \
 	-d '{"sql":"INSERT INTO orders (status, total) VALUES ('"'"'pending'"'"', 42.00)"}'
 ```
 
@@ -850,7 +850,7 @@ List tables the agent has policy access to.
 
 ```bash
 curl http://localhost:3000/api/v1/tables \
-	-H "X-API-Key: eko_your-api-key-here"
+	-H "X-API-Key: aqg_your-api-key-here"
 ```
 
 ---
@@ -874,7 +874,7 @@ Get the column schema for a specific table (runs `DESCRIBE`).
 
 ```bash
 curl http://localhost:3000/api/v1/tables/orders/schema \
-	-H "X-API-Key: eko_your-api-key-here"
+	-H "X-API-Key: aqg_your-api-key-here"
 ```
 
 ---
@@ -894,5 +894,5 @@ Health check for the authenticated agent.
 
 ```bash
 curl http://localhost:3000/api/v1/health \
-	-H "X-API-Key: eko_your-api-key-here"
+	-H "X-API-Key: aqg_your-api-key-here"
 ```

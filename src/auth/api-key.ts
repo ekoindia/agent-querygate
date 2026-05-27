@@ -1,9 +1,9 @@
 import { randomBytes, createHash } from "crypto";
 
-const PREFIX = "eko_";
+const PREFIX = "aqg_";
 
 /**
- * Generates a new API key with the "eko_" prefix.
+ * Generates a new API key with the "aqg_" prefix.
  * The key consists of the prefix followed by 32 random bytes encoded as base64url.
  * @returns A new API key string.
  */

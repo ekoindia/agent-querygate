@@ -1,12 +1,12 @@
 # Security
 
-This document describes the security architecture, authentication mechanisms, authorization model, encryption practices, and operational recommendations for the Eko MySQL Agent Connector Service.
+This document describes the security architecture, authentication mechanisms, authorization model, encryption practices, and operational recommendations for the Agent QueryGate.
 
 ## Architecture Overview
 
 ```
 +-------------------+       +------------------------+       +------------------+
-|   AI Assistant    |       |   Eko Connector        |       |   Target MySQL   |
+|   AI Assistant    |       |   QueryGate        |       |   Target MySQL   |
 |   (Claude, etc.)  |       |   Service              |       |   Databases      |
 |                   |       |                        |       |                  |
 |  X-API-Key -------+------>|  Policy Engine         |       |                  |
@@ -47,7 +47,7 @@ Admin users authenticate via the `/admin/api/auth/login` endpoint. On success:
 
 AI agents authenticate via the `X-API-Key` header. The key lifecycle:
 
-1. **Generation:** `eko_` prefix + 32 random bytes (base64url-encoded), producing a key like `eko_AbCdEf...` (approximately 47 characters total).
+1. **Generation:** `aqg_` prefix + 32 random bytes (base64url-encoded), producing a key like `aqg_AbCdEf...` (approximately 47 characters total).
 2. **Storage:** Only the **SHA-256 hash** of the key is stored in the `agents.api_key_hash` column. The plaintext key is shown once at creation time and cannot be recovered.
 3. **Verification:** On each request, the `agentAuth` middleware hashes the provided key with SHA-256 and looks it up in the database. Constant-time properties are achieved because both values being compared are fixed-length hex digests.
 4. **Revocation:** Setting `isActive = false` on the agent immediately blocks all requests, even with a valid key.

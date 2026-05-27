@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide walks you through installing, configuring, and running the Eko MySQL Agent Connector Service from scratch.
+This guide walks you through installing, configuring, and running the Agent QueryGate from scratch.
 
 ## Prerequisites
 
@@ -13,7 +13,7 @@ This guide walks you through installing, configuring, and running the Eko MySQL 
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd eko-mysql-agent-connector-service
+cd agent-querygate
 
 # Install backend dependencies
 npm install
@@ -34,7 +34,7 @@ cp .env.example .env
 |---|---|---|---|
 | `ADMIN_DB_HOST` | MySQL host for the admin database | `localhost` | No |
 | `ADMIN_DB_PORT` | MySQL port for the admin database | `3306` | No |
-| `ADMIN_DB_NAME` | Admin database name | `eko_connector_admin` | No |
+| `ADMIN_DB_NAME` | Admin database name | `querygate_admin` | No |
 | `ADMIN_DB_USER` | MySQL user for the admin database | `root` | No |
 | `ADMIN_DB_PASSWORD` | MySQL password for the admin database | (empty) | No |
 | `JWT_SECRET` | Secret for signing JWT tokens (min 16 chars) | -- | **Yes** |
@@ -57,7 +57,7 @@ openssl rand -hex 32
 1. Create the admin database in MySQL:
 
 ```sql
-CREATE DATABASE eko_connector_admin;
+CREATE DATABASE querygate_admin;
 ```
 
 2. Generate and run Drizzle migrations:

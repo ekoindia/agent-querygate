@@ -21,7 +21,7 @@ interface ThemeProviderProps {
 export function ThemeProvider({
 	children,
 	defaultTheme = "dark",
-	storageKey = "eko-ui-theme",
+	storageKey = "querygate-ui-theme",
 }: ThemeProviderProps) {
 	const [theme, setTheme] = useState<Theme>(
 		() => (localStorage.getItem(storageKey) as Theme) || defaultTheme,

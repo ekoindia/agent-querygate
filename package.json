@@ -1,5 +1,5 @@
 {
-	"name": "eko-mysql-agent-connector-service",
+	"name": "agent-querygate",
 	"version": "0.1.0",
 	"type": "module",
 	"scripts": {

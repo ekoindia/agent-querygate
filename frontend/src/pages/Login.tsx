@@ -78,10 +78,10 @@ export function Login() {
 					</div>
 					<div className="text-center">
 						<h1 className="text-xl font-semibold tracking-tight text-foreground">
-							Eko MySQL Agent
+							Agent QueryGate
 						</h1>
 						<p className="mt-1 text-sm text-muted-foreground">
-							Connector Service Admin
+							Admin Dashboard
 						</p>
 					</div>
 				</div>
