@@ -435,3 +435,9 @@ eko-mysql-agent-connector-service/
 - Admin JWT stored in httpOnly secure cookie
 - Connection pools per target database, created on first use, cached in memory
 - Write operations wrapped in transactions for snapshot capture
+- Follow test-driven development (TDD) approach for critical components (policy engine, query executor, auth)
+- Comprehensive unit and integration tests, especially for policy enforcement logic and security-sensitive areas (auth, credential handling)
+- Maintain detailed documentation:
+  - README.md for project overview, main components, setup and usage
+  - Detailed documentations in the `docs` folder
+  - JSDoc comments, inline code comments, and API docs for REST endpoints and MCP tools.
