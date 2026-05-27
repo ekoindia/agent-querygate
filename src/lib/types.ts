@@ -43,3 +43,13 @@ export interface AuthenticatedUser {
 	email: string;
 	role: UserRole;
 }
+
+/** Hono environment type with context variable bindings used across routes. */
+export interface AppEnv {
+	Variables: {
+		config: import("@/config.js").Config;
+		db: import("@/db/connection.js").Database;
+		user: AuthenticatedUser;
+		agent: AuthenticatedAgent;
+	};
+}
