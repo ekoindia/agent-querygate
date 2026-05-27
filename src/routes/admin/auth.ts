@@ -58,6 +58,13 @@ authRoutes.post("/setup", zValidator("json", setupSchema), async (c) => {
 	});
 });
 
+// ── GET /setup-status ─────────────────────────────────────────────
+authRoutes.get("/setup-status", async (c) => {
+	const db = c.get("db");
+	const [result] = await db.select({ total: count() }).from(users);
+	return c.json({ needsSetup: result.total === 0 });
+});
+
 // ── POST /login ───────────────────────────────────────────────────
 const loginSchema = z.object({
 	email: z.string().email(),
