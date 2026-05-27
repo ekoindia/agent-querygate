@@ -3,7 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 import { eq, and } from "drizzle-orm";
-import { agents, agentDatabaseAccess } from "@/db/schema.js";
+import { agents, agentDatabaseAccess, databases } from "@/db/schema.js";
 import { generateApiKey, hashApiKey } from "@/auth/api-key.js";
 import { adminAuth } from "@/auth/middleware.js";
 import { Errors } from "@/lib/errors.js";
@@ -216,6 +216,21 @@ agentRoutes.post("/:id/databases/:dbId", async (c) => {
 		throw Errors.notFound("Agent not found");
 	}
 
+	// Verify database ownership for non-admin users
+	const [dbRecord] = await db
+		.select()
+		.from(databases)
+		.where(eq(databases.id, dbId))
+		.limit(1);
+
+	if (!dbRecord) {
+		throw Errors.notFound("Database not found");
+	}
+
+	if (user.role === "user" && dbRecord.userId !== user.userId) {
+		throw Errors.notFound("Database not found");
+	}
+
 	// Check if access already exists
 	const [existing] = await db
 		.select()
@@ -261,6 +276,19 @@ agentRoutes.delete("/:id/databases/:dbId", async (c) => {
 
 	if (user.role === "user" && agent.userId !== user.userId) {
 		throw Errors.notFound("Agent not found");
+	}
+
+	// Verify database ownership for non-admin users
+	if (user.role === "user") {
+		const [dbRecord] = await db
+			.select()
+			.from(databases)
+			.where(eq(databases.id, dbId))
+			.limit(1);
+
+		if (!dbRecord || dbRecord.userId !== user.userId) {
+			throw Errors.notFound("Database not found");
+		}
 	}
 
 	await db

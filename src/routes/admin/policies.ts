@@ -3,10 +3,26 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 import { eq, and } from "drizzle-orm";
-import { policies, agentDatabaseAccess } from "@/db/schema.js";
+import { policies, agentDatabaseAccess, agents } from "@/db/schema.js";
 import { adminAuth } from "@/auth/middleware.js";
 import { Errors } from "@/lib/errors.js";
-import type { AppEnv } from "@/lib/types.js";
+import type { AppEnv, AuthenticatedUser } from "@/lib/types.js";
+
+async function verifyAccessOwnership(
+	db: any,
+	user: AuthenticatedUser,
+	agentId: string,
+) {
+	if (user.role === "admin" || user.role === "superadmin") return;
+	const [agent] = await db
+		.select()
+		.from(agents)
+		.where(eq(agents.id, agentId))
+		.limit(1);
+	if (!agent || agent.userId !== user.userId) {
+		throw Errors.notFound("Agent not found");
+	}
+}
 
 const policyRoutes = new Hono<AppEnv>();
 
@@ -17,6 +33,9 @@ policyRoutes.get("/agents/:agentId/databases/:dbId/policies", async (c) => {
 	const agentId = c.req.param("agentId");
 	const dbId = c.req.param("dbId");
 	const db = c.get("db");
+	const user = c.get("user");
+
+	await verifyAccessOwnership(db, user, agentId);
 
 	const [access] = await db
 		.select()
@@ -59,6 +78,9 @@ policyRoutes.post(
 		const dbId = c.req.param("dbId");
 		const body = c.req.valid("json");
 		const db = c.get("db");
+		const user = c.get("user");
+
+		await verifyAccessOwnership(db, user, agentId);
 
 		const [access] = await db
 			.select()
@@ -125,6 +147,7 @@ policyRoutes.put(
 		const policyId = c.req.param("id");
 		const body = c.req.valid("json");
 		const db = c.get("db");
+		const user = c.get("user");
 
 		const [policy] = await db
 			.select()
@@ -134,6 +157,16 @@ policyRoutes.put(
 
 		if (!policy) {
 			throw Errors.notFound("Policy not found");
+		}
+
+		// Verify ownership through access → agent chain
+		const [access] = await db
+			.select()
+			.from(agentDatabaseAccess)
+			.where(eq(agentDatabaseAccess.id, policy.agentDatabaseAccessId))
+			.limit(1);
+		if (access) {
+			await verifyAccessOwnership(db, user, access.agentId);
 		}
 
 		const updates: Record<string, unknown> = {};
@@ -162,6 +195,7 @@ policyRoutes.put(
 policyRoutes.delete("/policies/:id", async (c) => {
 	const policyId = c.req.param("id");
 	const db = c.get("db");
+	const user = c.get("user");
 
 	const [policy] = await db
 		.select()
@@ -171,6 +205,16 @@ policyRoutes.delete("/policies/:id", async (c) => {
 
 	if (!policy) {
 		throw Errors.notFound("Policy not found");
+	}
+
+	// Verify ownership through access → agent chain
+	const [access] = await db
+		.select()
+		.from(agentDatabaseAccess)
+		.where(eq(agentDatabaseAccess.id, policy.agentDatabaseAccessId))
+		.limit(1);
+	if (access) {
+		await verifyAccessOwnership(db, user, access.agentId);
 	}
 
 	await db.delete(policies).where(eq(policies.id, policyId));

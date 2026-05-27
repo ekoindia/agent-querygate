@@ -122,6 +122,13 @@ auditRoutes.get("/export", async (c) => {
 		.where(whereClause)
 		.orderBy(desc(auditLogs.createdAt));
 
+	// Escape CSV fields to prevent formula injection
+	function csvEscape(value: string): string {
+		const needsPrefix = /^[=+\-@\t\r]/.test(value);
+		const safe = needsPrefix ? `'${value}` : value;
+		return `"${safe.replace(/"/g, '""')}"`;
+	}
+
 	// Build CSV
 	const headers = [
 		"id",
@@ -144,11 +151,11 @@ auditRoutes.get("/export", async (c) => {
 			row.agentId,
 			row.databaseId,
 			row.userId,
-			`"${row.sqlQuery.replace(/"/g, '""')}"`,
+			csvEscape(row.sqlQuery),
 			row.operationType,
 			row.status,
 			row.affectedRows ?? "",
-			row.denialReason ? `"${row.denialReason.replace(/"/g, '""')}"` : "",
+			row.denialReason ? csvEscape(row.denialReason) : "",
 			row.executionTimeMs ?? "",
 			row.createdAt?.toISOString() ?? "",
 		];
