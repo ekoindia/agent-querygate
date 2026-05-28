@@ -29,12 +29,14 @@ export interface QueryResult {
 }
 
 export type UserRole = "superadmin" | "admin" | "user";
+export type AgentRole = "executor" | "auditor";
 
 /** Agent identity extracted from a valid agent API key. */
 export interface AuthenticatedAgent {
 	agentId: string;
 	userId: string;
 	agentName: string;
+	role: AgentRole;
 }
 
 /** User identity extracted from a valid JWT. */

@@ -22,6 +22,7 @@ import agentQueryRoutes from "@/routes/agent/query.js";
 import agentExecuteRoutes from "@/routes/agent/execute.js";
 import agentTableRoutes from "@/routes/agent/tables.js";
 import agentHealthRoutes from "@/routes/agent/health.js";
+import auditorAgentRoutes from "@/routes/agent/audit.js";
 
 const config = loadConfig();
 const db = getDatabase(config);
@@ -63,6 +64,7 @@ app.route("/api/v1", agentQueryRoutes);
 app.route("/api/v1", agentExecuteRoutes);
 app.route("/api/v1", agentTableRoutes);
 app.route("/api/v1", agentHealthRoutes);
+app.route("/api/v1", auditorAgentRoutes);
 
 // Serve frontend SPA (static files)
 app.use("/*", serveStatic({ root: "./frontend/dist" }));

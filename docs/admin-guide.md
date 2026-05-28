@@ -73,8 +73,11 @@ Agents represent AI assistants or automated systems that interact with your data
 1. Navigate to **Agents** in the sidebar.
 2. Click **Create Agent**.
 3. Enter a descriptive name (e.g., "Claude Desktop - Orders").
-4. Click **Create**.
-5. **Copy the API key immediately** -- it is shown only once and stored as a SHA-256 hash.
+4. Select the **role**:
+   - **Executor** (default) -- can run SQL queries and mutations against target databases.
+   - **Auditor** -- can only read audit logs and create review/flags. Cannot execute any SQL.
+5. Click **Create**.
+6. **Copy the API key immediately** -- it is shown only once and stored as a SHA-256 hash.
 
 ### API Key Lifecycle
 
@@ -159,6 +162,7 @@ Navigate to **Audit** in the sidebar. The log table shows:
 - Operation type (SELECT, INSERT, UPDATE, DELETE)
 - Status (allowed, denied, error)
 - Affected rows (for writes)
+- Reason (agent-supplied reasoning for the operation, if provided)
 - Execution time
 
 ### Filtering
@@ -175,8 +179,10 @@ Use the filter controls to narrow results:
 Click on a log entry to see full details, including:
 - The complete SQL query
 - Denial reason (if denied)
+- Agent reasoning (why the agent performed the operation)
 - **Data Before** -- snapshot of affected rows before the mutation
 - **Data After** -- snapshot of affected rows after the mutation
+- **Reviews** -- any flags/reviews attached to this log entry
 
 Before/after snapshots are captured for UPDATE and DELETE operations (up to 1000 rows).
 
@@ -186,6 +192,38 @@ Click **Export CSV** to download the filtered audit logs. The export:
 - Applies the same filters as the current view
 - Escapes values to prevent CSV formula injection (prefixes cells starting with `=`, `+`, `-`, `@`, tab, or carriage return)
 - Downloads as `audit-logs.csv`
+
+## Audit Reviews
+
+Audit log entries can be flagged with reviews by both AI auditor agents and human administrators.
+
+### Creating a Review
+
+From the audit log detail view, click **Add Review** and fill in:
+- **Flag Type** -- categorize the issue:
+  - `suspicious_pattern` -- unusual query patterns
+  - `policy_violation` -- potential policy circumvention
+  - `data_anomaly` -- unexpected data changes
+  - `performance_concern` -- slow or resource-heavy operations
+  - `manual_review` -- general review or resolution note
+- **Severity** -- `low`, `medium`, `high`, or `critical`
+- **Notes** -- optional free-text explanation
+
+### Review Workflow
+
+Reviews are **append-only**. You cannot edit or delete a review once created. To resolve a flag or mark it as a false positive, create a new review with `flag_type: manual_review` and explanatory notes.
+
+Reviews created from the admin panel have `reviewerType: human`. Reviews created by auditor agents have `reviewerType: ai`.
+
+### Setting Up an Auditor Agent
+
+To automate audit review:
+1. Create an agent with **role: auditor**.
+2. Configure its MCP server with `AQG_AGENT_ROLE=auditor`.
+3. The auditor agent can search audit logs, inspect entries, and create reviews programmatically.
+4. The auditor cannot read its own audit trail, ensuring separation of concerns.
+
+---
 
 ## Dashboard
 

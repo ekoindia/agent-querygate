@@ -72,6 +72,22 @@ Every CRUD endpoint applies ownership checks:
 - Admin/superadmin bypass ownership checks and see all resources.
 - If a regular user attempts to access another user's resource, the response is `404 Not Found` (not `403 Forbidden`) to avoid information leakage.
 
+### Agent Role Hierarchy
+
+Agents have a separate role system from admin users:
+
+```
+executor -- can run queries and mutations (query, execute, tables, describe)
+auditor  -- can read audit logs and create reviews (audit/logs, audit/reviews)
+```
+
+- **executor** agents are blocked from audit review endpoints (403).
+- **auditor** agents are blocked from query execution endpoints (403).
+- **auditor** agents cannot read their own audit trail -- a `ne(agentId)` filter is always applied. This prevents an agent from auditing itself.
+- Both roles can access the health endpoint.
+
+Role is set at agent creation and can be changed via the admin API.
+
 ### Admin-Only Endpoints
 
 The user management endpoints (`/admin/api/users/*`) use an additional `adminOnlyAuth` middleware that rejects users with the `user` role entirely.
@@ -168,7 +184,21 @@ Each audit log entry records:
 - Before/after data snapshots (for writes, up to 1000 rows)
 - Policy ID that governed the decision
 - Denial reason (if denied)
+- Agent-supplied reasoning (optional `reason` field -- the agent's explanation for the operation)
 - Execution time in milliseconds
+
+### Audit Reviews
+
+Audit log entries can be flagged with reviews by both AI auditor agents and human admin users. Reviews are stored in a separate `audit_reviews` table to keep audit logs immutable.
+
+Each review records:
+- **Flag type:** `suspicious_pattern`, `policy_violation`, `data_anomaly`, `performance_concern`, or `manual_review`
+- **Severity:** `low`, `medium`, `high`, or `critical`
+- **Reviewer type:** `human` (admin panel) or `ai` (auditor agent)
+- **Reviewer ID:** the agent or user who created the review
+- **Notes:** free-text explanation
+
+Reviews are append-only -- there is no update or delete. To resolve a flag, create a new `manual_review` entry with resolution notes.
 
 ### CSV Export Protection
 
@@ -200,6 +230,13 @@ The CSV export feature protects against formula injection attacks by prefixing c
 - Rotate keys periodically using the **Regenerate Key** feature.
 - Deactivate agents immediately if a key is suspected to be compromised.
 - Use descriptive agent names to make audit logs meaningful.
+
+### Auditor Agent Setup
+
+- Create a separate agent with `role: "auditor"` to periodically review audit logs.
+- Consider using a different AI model for the auditor than the executor to avoid systemic blind spots.
+- The auditor agent cannot read its own audit trail, enforcing separation of concerns.
+- Set up the auditor's MCP server with `AQG_AGENT_ROLE=auditor` to expose only audit tools.
 
 ### Monitoring and Alerting
 

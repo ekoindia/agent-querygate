@@ -16,6 +16,10 @@ import {
 export const userRoleEnum = ["superadmin", "admin", "user"] as const;
 export const operationTypeEnum = ["SELECT", "INSERT", "UPDATE", "DELETE"] as const;
 export const auditStatusEnum = ["allowed", "denied", "error"] as const;
+export const agentRoleEnum = ["executor", "auditor"] as const;
+export const flagTypeEnum = ["suspicious_pattern", "policy_violation", "data_anomaly", "performance_concern", "manual_review"] as const;
+export const severityEnum = ["low", "medium", "high", "critical"] as const;
+export const reviewerTypeEnum = ["human", "ai"] as const;
 
 // ── Users ──────────────────────────────────────────────────────────
 
@@ -74,6 +78,7 @@ export const agents = mysqlTable("agents", {
 	userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
 	name: varchar("name", { length: 255 }).notNull(),
 	apiKeyHash: varchar("api_key_hash", { length: 255 }).notNull(),
+	role: mysqlEnum("role", agentRoleEnum).notNull().default("executor"),
 	isActive: boolean("is_active").notNull().default(true),
 	createdAt: datetime("created_at").notNull().$defaultFn(() => new Date()),
 	updatedAt: datetime("updated_at").notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
@@ -154,10 +159,11 @@ export const auditLogs = mysqlTable("audit_logs", {
 	policyId: varchar("policy_id", { length: 36 }),
 	denialReason: text("denial_reason"),
 	executionTimeMs: int("execution_time_ms"),
+	reason: text("reason"),
 	createdAt: datetime("created_at").notNull().$defaultFn(() => new Date()),
 });
 
-export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+export const auditLogsRelations = relations(auditLogs, ({ one, many }) => ({
 	agent: one(agents, {
 		fields: [auditLogs.agentId],
 		references: [agents.id],
@@ -169,5 +175,26 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
 	user: one(users, {
 		fields: [auditLogs.userId],
 		references: [users.id],
+	}),
+	reviews: many(auditReviews),
+}));
+
+// ── Audit Reviews ─────────────────────────────────────────────────
+
+export const auditReviews = mysqlTable("audit_reviews", {
+	id: varchar("id", { length: 36 }).primaryKey(),
+	auditLogId: varchar("audit_log_id", { length: 36 }).notNull().references(() => auditLogs.id),
+	flagType: mysqlEnum("flag_type", flagTypeEnum).notNull(),
+	severity: mysqlEnum("severity", severityEnum).notNull(),
+	reviewerType: mysqlEnum("reviewer_type", reviewerTypeEnum).notNull(),
+	reviewerId: varchar("reviewer_id", { length: 36 }).notNull(),
+	notes: text("notes"),
+	createdAt: datetime("created_at").notNull().$defaultFn(() => new Date()),
+});
+
+export const auditReviewsRelations = relations(auditReviews, ({ one }) => ({
+	auditLog: one(auditLogs, {
+		fields: [auditReviews.auditLogId],
+		references: [auditLogs.id],
 	}),
 }));

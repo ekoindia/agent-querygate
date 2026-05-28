@@ -11,7 +11,9 @@ A security broker between AI agents and MySQL databases. Provides policy-based g
 ## Features
 
 - **Policy-based access control** -- default-deny with per-table, per-column, and per-operation rules
-- **Audit logging** -- every query logged with before/after data diffs for write operations
+- **Audit logging** -- every query logged with before/after data diffs, optional agent-supplied reasoning
+- **Audit review system** -- AI or human reviewers can flag audit entries with severity levels and notes
+- **Agent roles** -- executor agents run queries, auditor agents review audit trails
 - **MCP integration** -- Model Context Protocol server for Claude and other AI agents
 - **REST API** -- standard HTTP endpoints any agent or client can use
 - **Admin dashboard** -- React SPA with dark theme for managing users, databases, agents, and policies
@@ -134,7 +136,7 @@ agent-querygate/
 |   +-- mcp/
 |   |   +-- server.ts            # MCP server wrapping REST API
 |   +-- routes/
-|   |   +-- agent/               # Agent-facing endpoints
+|   |   +-- agent/               # Agent-facing endpoints (executor + auditor)
 |   |   +-- admin/               # Admin dashboard endpoints
 |   +-- lib/
 |       +-- crypto.ts            # AES-256-GCM encrypt/decrypt
@@ -155,6 +157,8 @@ agent-querygate/
 
 All agent endpoints require an `X-API-Key` header.
 
+**Executor agents** (query/mutate data):
+
 | Method | Endpoint                       | Description                          |
 |--------|--------------------------------|--------------------------------------|
 | POST   | `/api/v1/query`                | Execute a read-only SELECT query     |
@@ -162,6 +166,15 @@ All agent endpoints require an `X-API-Key` header.
 | GET    | `/api/v1/tables`               | List tables the agent can access     |
 | GET    | `/api/v1/tables/:name/schema`  | Describe a table's columns           |
 | GET    | `/api/v1/health`               | Agent connection health check        |
+
+**Auditor agents** (review audit trails):
+
+| Method | Endpoint                       | Description                          |
+|--------|--------------------------------|--------------------------------------|
+| GET    | `/api/v1/audit/logs`           | Search and list audit logs           |
+| GET    | `/api/v1/audit/logs/:id`       | Get audit log detail with reviews    |
+| POST   | `/api/v1/audit/reviews`        | Flag an audit log entry              |
+| GET    | `/api/v1/audit/reviews`        | List reviews created by this auditor |
 
 ### Admin API
 
@@ -176,17 +189,21 @@ All admin endpoints require a JWT `Authorization: Bearer <token>` header (except
 | GET    | `/admin/api/databases`          | List registered databases           |
 | POST   | `/admin/api/databases`          | Register a target database          |
 | GET    | `/admin/api/agents`             | List agents                         |
-| POST   | `/admin/api/agents`             | Create agent (returns API key)      |
+| POST   | `/admin/api/agents`             | Create agent with role (returns API key) |
 | GET    | `/admin/api/agents/:id/policies`| List policies for an agent          |
 | POST   | `/admin/api/agents/:id/policies`| Create access policy                |
 | GET    | `/admin/api/audit`              | Query audit logs                    |
+| GET    | `/admin/api/audit/:id/reviews`  | List reviews for an audit log       |
+| POST   | `/admin/api/audit/:id/reviews`  | Create a review on an audit log     |
 | GET    | `/admin/api/dashboard`          | Dashboard statistics                |
 
 ---
 
 ## MCP Tools
 
-The MCP server wraps the REST API for use with Claude Desktop and other MCP-compatible clients. It connects via stdio transport.
+The MCP server wraps the REST API for use with Claude Desktop and other MCP-compatible clients. It connects via stdio transport. Tools registered depend on the agent role.
+
+**Executor tools** (default):
 
 | Tool                   | Description                                      |
 |------------------------|--------------------------------------------------|
@@ -194,6 +211,16 @@ The MCP server wraps the REST API for use with Claude Desktop and other MCP-comp
 | `mysql_execute`        | Execute a write SQL statement (INSERT/UPDATE/DELETE) |
 | `mysql_list_tables`    | List all tables the agent has access to           |
 | `mysql_describe_table` | Get column schema for a specific table            |
+| `mysql_health`         | Check agent connection health status              |
+
+**Auditor tools** (when `AQG_AGENT_ROLE=auditor`):
+
+| Tool                   | Description                                      |
+|------------------------|--------------------------------------------------|
+| `audit_list_logs`      | Search and list audit logs with filters           |
+| `audit_get_log`        | Get a single audit log with its reviews           |
+| `audit_create_review`  | Flag an audit log entry with severity and notes   |
+| `audit_list_reviews`   | List reviews created by this auditor              |
 | `mysql_health`         | Check agent connection health status              |
 
 ### Claude Desktop Configuration
@@ -208,12 +235,15 @@ Add to your `claude_desktop_config.json`:
 			"args": ["path/to/agent-querygate/dist/mcp/server.js"],
 			"env": {
 				"AQG_BASE_URL": "http://localhost:3000",
-				"AQG_API_KEY": "your-agent-api-key"
+				"AQG_API_KEY": "your-agent-api-key",
+				"AQG_AGENT_ROLE": "executor"
 			}
 		}
 	}
 }
 ```
+
+Set `AQG_AGENT_ROLE` to `auditor` for an auditor agent's MCP server.
 
 ---
 

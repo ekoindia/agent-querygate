@@ -15,9 +15,11 @@ The MCP server itself is stateless -- it delegates all authentication, authoriza
 
 ## Tools
 
-The MCP server exposes 5 tools:
+The MCP server registers different tools depending on the agent role. Executor agents get query/mutation tools; auditor agents get audit review tools. The `mysql_health` tool is available to both roles.
 
-### mysql_query
+### Executor Tools
+
+#### mysql_query
 
 Execute a read-only SQL query (SELECT) against the MySQL database.
 
@@ -25,6 +27,7 @@ Execute a read-only SQL query (SELECT) against the MySQL database.
 |---|---|---|---|
 | `sql` | string | Yes | The SQL SELECT query to execute |
 | `database_id` | string | No | Target database ID (optional if agent has access to only one database) |
+| `reason` | string | No | Why you are running this query (stored in audit log) |
 
 **Example response:**
 ```json
@@ -37,7 +40,7 @@ Execute a read-only SQL query (SELECT) against the MySQL database.
 }
 ```
 
-### mysql_execute
+#### mysql_execute
 
 Execute a write SQL statement (INSERT, UPDATE, DELETE) against the MySQL database.
 
@@ -45,6 +48,7 @@ Execute a write SQL statement (INSERT, UPDATE, DELETE) against the MySQL databas
 |---|---|---|---|
 | `sql` | string | Yes | The SQL write statement to execute |
 | `database_id` | string | No | Target database ID (optional if agent has access to only one database) |
+| `reason` | string | No | Why you are making this change (stored in audit log) |
 
 **Example response:**
 ```json
@@ -55,7 +59,7 @@ Execute a write SQL statement (INSERT, UPDATE, DELETE) against the MySQL databas
 }
 ```
 
-### mysql_list_tables
+#### mysql_list_tables
 
 List all tables the agent has access to in the MySQL database.
 
@@ -70,7 +74,7 @@ List all tables the agent has access to in the MySQL database.
 }
 ```
 
-### mysql_describe_table
+#### mysql_describe_table
 
 Get the column schema for a specific table in the MySQL database.
 
@@ -89,9 +93,76 @@ Get the column schema for a specific table in the MySQL database.
 }
 ```
 
-### mysql_health
+### Auditor Tools
 
-Check the health status of the MySQL agent connection.
+These tools are registered when `AQG_AGENT_ROLE=auditor`. They replace the executor tools (query/execute/tables/describe).
+
+#### audit_list_logs
+
+Search and list audit logs with filtering and pagination.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `page` | number | No | Page number (default 1) |
+| `limit` | number | No | Results per page (default 50, max 100) |
+| `agent` | string | No | Filter by agent ID |
+| `db` | string | No | Filter by database ID |
+| `op` | string | No | Filter by operation type (SELECT/INSERT/UPDATE/DELETE) |
+| `status` | string | No | Filter by status (allowed/denied/error) |
+| `from` | string | No | Start datetime (ISO 8601) |
+| `to` | string | No | End datetime (ISO 8601) |
+
+**Example response:**
+```json
+{
+	"logs": [
+		{
+			"id": "uuid",
+			"agentId": "uuid",
+			"sqlQuery": "UPDATE orders SET status='shipped' WHERE id = 5",
+			"operationType": "UPDATE",
+			"status": "allowed",
+			"reason": "Customer requested expedited shipping",
+			"createdAt": "ISO datetime"
+		}
+	],
+	"pagination": { "page": 1, "limit": 50, "total": 142, "totalPages": 3 }
+}
+```
+
+#### audit_get_log
+
+Get a single audit log entry with its reviews.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `id` | string | Yes | The audit log ID |
+
+#### audit_create_review
+
+Flag an audit log entry with a review/finding.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `audit_log_id` | string | Yes | The audit log ID to flag |
+| `flag_type` | string | Yes | One of: suspicious_pattern, policy_violation, data_anomaly, performance_concern, manual_review |
+| `severity` | string | Yes | One of: low, medium, high, critical |
+| `notes` | string | No | Optional review notes |
+
+#### audit_list_reviews
+
+List reviews/flags created by this auditor agent.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `page` | number | No | Page number |
+| `limit` | number | No | Results per page |
+
+### Common Tools
+
+#### mysql_health
+
+Check the health status of the MySQL agent connection. Available to both executor and auditor roles.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -117,7 +188,8 @@ Add the following to your Claude Desktop MCP configuration file (`claude_desktop
 			"args": ["tsx", "src/mcp/server.ts"],
 			"env": {
 				"AQG_BASE_URL": "http://localhost:3000",
-				"AQG_API_KEY": "aqg_your-api-key-here"
+				"AQG_API_KEY": "aqg_your-api-key-here",
+				"AQG_AGENT_ROLE": "executor"
 			}
 		}
 	}
@@ -136,7 +208,8 @@ If the service is installed globally or you have it in a specific path, use the 
 			"args": ["tsx", "/path/to/agent-querygate/src/mcp/server.ts"],
 			"env": {
 				"AQG_BASE_URL": "http://localhost:3000",
-				"AQG_API_KEY": "aqg_your-api-key-here"
+				"AQG_API_KEY": "aqg_your-api-key-here",
+				"AQG_AGENT_ROLE": "executor"
 			}
 		}
 	}
@@ -155,7 +228,8 @@ For Claude Code, add the MCP server to your project's `.claude/settings.json` or
 			"args": ["tsx", "/path/to/agent-querygate/src/mcp/server.ts"],
 			"env": {
 				"AQG_BASE_URL": "http://localhost:3000",
-				"AQG_API_KEY": "aqg_your-api-key-here"
+				"AQG_API_KEY": "aqg_your-api-key-here",
+				"AQG_AGENT_ROLE": "executor"
 			}
 		}
 	}
@@ -210,6 +284,21 @@ Below is an example of how Claude might use the MCP tools in a conversation:
 
 **Claude (calls `mysql_execute` with `sql: "UPDATE orders SET status = 'shipped' WHERE id = 42"`):**
 > Done. Order 42 has been updated from 'pending' to 'shipped'. The change affected 1 row.
+
+### Auditor Example Conversation
+
+**User:** "Review the last hour of database mutations for anything suspicious."
+
+**Claude (calls `audit_list_logs` with `op: "UPDATE"`, `from: "2026-05-28T09:00:00Z"`):**
+> I found 12 UPDATE operations in the last hour. Let me check the details.
+
+**Claude (calls `audit_get_log` for a suspicious entry):**
+> This entry updated 47 rows in the `customers` table with reason "batch cleanup" but it changed the `email` column, which is unusual.
+
+**Claude (calls `audit_create_review` with `flag_type: "data_anomaly"`, `severity: "high"`, `notes: "Bulk email change affecting 47 rows with vague reasoning"`):**
+> I've flagged this audit entry as a high-severity data anomaly. An admin should review the before/after data snapshots to confirm whether this was intentional.
+
+---
 
 ## Troubleshooting
 

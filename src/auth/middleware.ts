@@ -75,8 +75,33 @@ export const agentAuth = createMiddleware(async (c, next) => {
 		agentId: agent.id,
 		userId: agent.userId,
 		agentName: agent.name,
+		role: agent.role,
 	};
 
 	c.set("agent", authenticatedAgent);
+	await next();
+});
+
+/**
+ * Middleware that restricts access to executor agents only.
+ * Must be used after agentAuth.
+ */
+export const executorOnly = createMiddleware(async (c, next) => {
+	const agent = c.get("agent") as AuthenticatedAgent;
+	if (agent.role !== "executor") {
+		throw Errors.forbidden("This endpoint requires an executor agent");
+	}
+	await next();
+});
+
+/**
+ * Middleware that restricts access to auditor agents only.
+ * Must be used after agentAuth.
+ */
+export const auditorOnly = createMiddleware(async (c, next) => {
+	const agent = c.get("agent") as AuthenticatedAgent;
+	if (agent.role !== "auditor") {
+		throw Errors.forbidden("This endpoint requires an auditor agent");
+	}
 	await next();
 });

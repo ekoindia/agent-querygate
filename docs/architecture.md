@@ -151,10 +151,11 @@ Browser                  Service                          Admin DB
 | email (unique)   |   |   | userId (FK) ----+---+   | userId (FK) ----+--->users.id
 | passwordHash     |   |   | name             |   |   | name             |
 | name             |   |   | host             |   |   | apiKeyHash       |
-| role (enum)      |   |   | port             |   |   | isActive         |
-| createdBy (FK)---+---+   | dbName           |   |   | createdAt        |
-| isActive         |   |   | username         |   |   | updatedAt        |
-| createdAt        |   |   | passwordEncrypted|   |   +--------+---------+
+| role (enum)      |   |   | port             |   |   | role (enum)      |
+| createdBy (FK)---+---+   | dbName           |   |   | isActive         |
+| isActive         |   |   | username         |   |   | createdAt        |
+| createdAt        |   |   | passwordEncrypted|   |   | updatedAt        |
+| updatedAt        |   |   | createdAt        |   |   +--------+---------+
 | updatedAt        |   |   | createdAt        |   |            |
 +--------+---------+   |   | updatedAt        |   |            |
          |             |   +--------+---------+   |            |
@@ -207,7 +208,24 @@ Browser                  Service                          Admin DB
 | dataAfter (JSON|null)     |
 | policyId (varchar|null)   |
 | denialReason (text|null)  |
+| reason (text|null)        |
 | executionTimeMs (int|null)|
+| createdAt                 |
++---------------------------+
+         |
+         | 1:N
+         v
++---------------------------+
+|     audit_reviews         |
++---------------------------+
+| id (PK, UUID)             |
+| auditLogId (FK) -->       |
+|   audit_logs              |
+| flagType (enum)           |
+| severity (enum)           |
+| reviewerType (enum)       |
+| reviewerId (varchar)      |
+| notes (text|null)         |
 | createdAt                 |
 +---------------------------+
 ```
@@ -218,10 +236,11 @@ Browser                  Service                          Admin DB
 |---|---|---|
 | `users` | Admin panel accounts | Soft-delete via `isActive` flag |
 | `databases` | Target database connection configs | Password stored encrypted (AES-256-GCM) |
-| `agents` | AI agent identities | API key stored as SHA-256 hash |
+| `agents` | AI agent identities with role (executor/auditor) | API key stored as SHA-256 hash |
 | `agent_database_access` | Many-to-many junction: agent <-> database | Unique index on (agentId, databaseId) |
 | `policies` | Per-table access rules for an agent-database pair | JSON columns for flexible operations/columns lists |
-| `audit_logs` | Immutable query log | JSON columns for before/after snapshots |
+| `audit_logs` | Immutable query log with agent-supplied reasoning | JSON columns for before/after snapshots |
+| `audit_reviews` | Mutable review layer for flagging audit entries | Append-only, supports AI and human reviewers |
 
 ### Key Design Decisions
 
@@ -292,7 +311,7 @@ Manages an in-memory `Map<databaseId, mysql.Pool>`:
 Writes structured audit log entries to the admin database:
 
 - Called asynchronously (does not block the response in some paths).
-- Captures: agent, database, user, query, policy result, snapshots, timing.
+- Captures: agent, database, user, query, policy result, snapshots, timing, and optional agent-supplied reasoning.
 - Status is derived from the entry: `error` if an error field is present, `denied` if policy rejected, `allowed` otherwise.
 
 ### Auth Layer (`src/auth/`)
@@ -300,12 +319,14 @@ Writes structured audit log entries to the admin database:
 - `jwt.ts` -- sign and verify JWTs with `jsonwebtoken`
 - `api-key.ts` -- generate (`aqg_` + 32 random bytes), hash (SHA-256), verify
 - `password.ts` -- bcrypt hash (12 rounds) and verify
-- `middleware.ts` -- Hono middleware: `adminAuth`, `adminOnlyAuth`, `agentAuth`
+- `middleware.ts` -- Hono middleware: `adminAuth`, `adminOnlyAuth`, `agentAuth`, `executorOnly`, `auditorOnly`
 
 ### MCP Server (`src/mcp/server.ts`)
 
 A thin adapter layer that:
-- Creates a `McpServer` instance with 5 registered tools
+- Creates a `McpServer` instance with role-conditional tool registration
+- Executor role: 4 query/mutation tools + health
+- Auditor role: 4 audit review tools + health
 - Each tool maps to a REST API call via `fetch()`
 - Runs via `StdioServerTransport` for use as a subprocess
 - Stateless -- all logic is in the main service

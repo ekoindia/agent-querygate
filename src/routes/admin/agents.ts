@@ -35,6 +35,7 @@ agentRoutes.get("/", async (c) => {
 			id: agents.id,
 			userId: agents.userId,
 			name: agents.name,
+			role: agents.role,
 			isActive: agents.isActive,
 			createdAt: agents.createdAt,
 		})
@@ -47,6 +48,7 @@ agentRoutes.get("/", async (c) => {
 // ── POST / ────────────────────────────────────────────────────────
 const createAgentSchema = z.object({
 	name: z.string().min(1),
+	role: z.enum(["executor", "auditor"]).default("executor"),
 });
 
 agentRoutes.post("/", zValidator("json", createAgentSchema), async (c) => {
@@ -63,11 +65,12 @@ agentRoutes.post("/", zValidator("json", createAgentSchema), async (c) => {
 		userId: user.userId,
 		name: body.name,
 		apiKeyHash,
+		role: body.role,
 	});
 
 	return c.json(
 		{
-			agent: { id, name: body.name, isActive: true },
+			agent: { id, name: body.name, role: body.role, isActive: true },
 			apiKey,
 		},
 		201,
@@ -78,6 +81,7 @@ agentRoutes.post("/", zValidator("json", createAgentSchema), async (c) => {
 const updateAgentSchema = z.object({
 	name: z.string().min(1).optional(),
 	isActive: z.boolean().optional(),
+	role: z.enum(["executor", "auditor"]).optional(),
 });
 
 agentRoutes.put("/:id", zValidator("json", updateAgentSchema), async (c) => {
@@ -103,6 +107,7 @@ agentRoutes.put("/:id", zValidator("json", updateAgentSchema), async (c) => {
 	const updates: Record<string, unknown> = {};
 	if (body.name !== undefined) updates.name = body.name;
 	if (body.isActive !== undefined) updates.isActive = body.isActive;
+	if (body.role !== undefined) updates.role = body.role;
 
 	if (Object.keys(updates).length > 0) {
 		await db.update(agents).set(updates).where(eq(agents.id, agentId));

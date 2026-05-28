@@ -13,6 +13,7 @@ export interface AuditEntry {
 	snapshot?: SnapshotResult;
 	executionTimeMs?: number;
 	error?: string;
+	reason?: string;
 }
 
 /**
@@ -50,6 +51,7 @@ export async function writeAuditLog(
 		policyId: entry.policyResult.policyId ?? null,
 		denialReason: entry.policyResult.denialReason ?? entry.error ?? null,
 		executionTimeMs: entry.executionTimeMs ?? null,
+		reason: entry.reason ?? null,
 	});
 
 	return id;

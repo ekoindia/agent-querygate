@@ -94,7 +94,7 @@ Go to the **Databases** page and add a MySQL database you want agents to query. 
 
 ### 5. Create an agent
 
-Go to the **Agents** page and create a new agent. The API key is displayed once -- copy and store it securely. This key is used by AI agents (or the MCP server) to authenticate against the Agent API.
+Go to the **Agents** page and create a new agent. Choose the **executor** role (default) for agents that query databases, or **auditor** for agents that review audit logs. The API key is displayed once -- copy and store it securely. This key is used by AI agents (or the MCP server) to authenticate against the Agent API.
 
 ### 6. Grant database access and configure policies
 

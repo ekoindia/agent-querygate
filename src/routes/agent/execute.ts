@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
-import { agentAuth } from "@/auth/middleware.js";
+import { agentAuth, executorOnly } from "@/auth/middleware.js";
 import { checkBlockedKeywords } from "@/policy/blocked-keywords.js";
 import { parseSql } from "@/policy/sql-parser.js";
 import { evaluatePolicy, getPolicyRowLimit } from "@/policy/engine.js";
@@ -21,6 +21,7 @@ const executeRoutes = new Hono<AppEnv>();
 const executeBodySchema = z.object({
 	sql: z.string().min(1),
 	database_id: z.string().optional(),
+	reason: z.string().max(2000).optional(),
 });
 
 /**
@@ -31,6 +32,7 @@ const executeBodySchema = z.object({
 executeRoutes.post(
 	"/execute",
 	agentAuth,
+	executorOnly,
 	zValidator("json", executeBodySchema),
 	async (c) => {
 		const agent = c.get("agent") as AuthenticatedAgent;
@@ -88,13 +90,13 @@ executeRoutes.post(
 		const policyResult = evaluatePolicy(parsed, policyRecords);
 
 		if (!policyResult.allowed) {
-			// Write audit log for denied operation
 			await writeAuditLog(db, {
 				agentId: agent.agentId,
 				databaseId,
 				userId: agent.userId,
 				query: parsed,
 				policyResult,
+				reason: body.reason,
 			});
 			throw Errors.policyDenied(policyResult.denialReason ?? "Policy denied");
 		}
@@ -122,6 +124,7 @@ executeRoutes.post(
 					userId: agent.userId,
 					query: parsed,
 					policyResult: deniedResult,
+					reason: body.reason,
 				});
 				throw Errors.policyDenied(deniedResult.denialReason);
 			}
@@ -132,7 +135,6 @@ executeRoutes.post(
 		const snapshot = await executeWriteQuery(pool, parsed);
 		const executionTimeMs = Date.now() - startTime;
 
-		// 9. Write audit log with snapshot data
 		await writeAuditLog(db, {
 			agentId: agent.agentId,
 			databaseId,
@@ -141,6 +143,7 @@ executeRoutes.post(
 			policyResult,
 			snapshot,
 			executionTimeMs,
+			reason: body.reason,
 		});
 
 		return c.json({

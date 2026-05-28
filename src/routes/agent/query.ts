@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
-import { agentAuth } from "@/auth/middleware.js";
+import { agentAuth, executorOnly } from "@/auth/middleware.js";
 import { checkBlockedKeywords } from "@/policy/blocked-keywords.js";
 import { parseSql } from "@/policy/sql-parser.js";
 import { evaluatePolicy } from "@/policy/engine.js";
@@ -73,6 +73,7 @@ const queryRoutes = new Hono<AppEnv>();
 const queryBodySchema = z.object({
 	sql: z.string().min(1),
 	database_id: z.string().optional(),
+	reason: z.string().max(2000).optional(),
 });
 
 /**
@@ -83,6 +84,7 @@ const queryBodySchema = z.object({
 queryRoutes.post(
 	"/query",
 	agentAuth,
+	executorOnly,
 	zValidator("json", queryBodySchema),
 	async (c) => {
 		const agent = c.get("agent") as AuthenticatedAgent;
@@ -139,13 +141,13 @@ queryRoutes.post(
 		// 6. Evaluate policy
 		const policyResult = evaluatePolicy(parsed, policyRecords);
 
-		// 7. Write audit log (whether allowed or denied)
 		await writeAuditLog(db, {
 			agentId: agent.agentId,
 			databaseId,
 			userId: agent.userId,
 			query: parsed,
 			policyResult,
+			reason: body.reason,
 		});
 
 		if (!policyResult.allowed) {

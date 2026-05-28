@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { eq, and } from "drizzle-orm";
 import type { RowDataPacket } from "mysql2/promise";
-import { agentAuth } from "@/auth/middleware.js";
+import { agentAuth, executorOnly } from "@/auth/middleware.js";
 import { getTargetPool } from "@/query/pool-manager.js";
 import { agentDatabaseAccess, policies } from "@/db/schema.js";
 import { Errors } from "@/lib/errors.js";
@@ -15,7 +15,7 @@ const tableRoutes = new Hono<AppEnv>();
  * GET /tables
  * Returns the list of tables the agent has policy access to.
  */
-tableRoutes.get("/tables", agentAuth, async (c) => {
+tableRoutes.get("/tables", agentAuth, executorOnly, async (c) => {
 	const agent = c.get("agent") as AuthenticatedAgent;
 	const db = c.get("db");
 	const databaseIdParam = c.req.query("database_id");
@@ -54,7 +54,7 @@ tableRoutes.get("/tables", agentAuth, async (c) => {
  * GET /tables/:name/schema
  * Returns the column schema for a specific table using DESCRIBE.
  */
-tableRoutes.get("/tables/:name/schema", agentAuth, async (c) => {
+tableRoutes.get("/tables/:name/schema", agentAuth, executorOnly, async (c) => {
 	const agent = c.get("agent") as AuthenticatedAgent;
 	const db = c.get("db");
 	const config = c.get("config") as Config;

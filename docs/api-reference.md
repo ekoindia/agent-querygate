@@ -403,6 +403,7 @@ List agents (scoped by user role).
 			"id": "uuid",
 			"userId": "uuid",
 			"name": "string",
+			"role": "executor | auditor",
 			"isActive": true,
 			"createdAt": "ISO datetime"
 		}
@@ -420,7 +421,8 @@ Create a new agent. Returns the API key -- this is the only time it is shown in 
 - **Request Body:**
 ```json
 {
-	"name": "string (required)"
+	"name": "string (required)",
+	"role": "executor | auditor (default: executor)"
 }
 ```
 - **Response (201):**
@@ -429,17 +431,20 @@ Create a new agent. Returns the API key -- this is the only time it is shown in 
 	"agent": {
 		"id": "uuid",
 		"name": "string",
+		"role": "executor",
 		"isActive": true
 	},
 	"apiKey": "aqg_base64url-encoded-random-key"
 }
 ```
 
+Agents with `executor` role can run queries and mutations. Agents with `auditor` role can only read audit logs and create reviews.
+
 ```bash
 curl -X POST http://localhost:3000/admin/api/agents \
 	-b cookies.txt \
 	-H "Content-Type: application/json" \
-	-d '{"name":"Claude Agent"}'
+	-d '{"name":"Claude Agent","role":"executor"}'
 ```
 
 ---
@@ -453,7 +458,8 @@ Update agent name or active status.
 ```json
 {
 	"name": "string (optional)",
-	"isActive": "boolean (optional)"
+	"isActive": "boolean (optional)",
+	"role": "executor | auditor (optional)"
 }
 ```
 - **Response:**
@@ -681,6 +687,7 @@ List audit logs with pagination and filtering.
 			"dataAfter": null,
 			"policyId": "uuid",
 			"denialReason": null,
+			"reason": "Checking order status for customer inquiry",
 			"executionTimeMs": 12,
 			"createdAt": "ISO datetime"
 		}
@@ -733,11 +740,66 @@ Get a single audit log entry with full details (including `dataBefore` and `data
 		"dataAfter": [{ "id": 5, "status": "shipped" }],
 		"policyId": "uuid",
 		"denialReason": null,
+		"reason": "Marking order as shipped per customer request",
 		"executionTimeMs": 45,
 		"createdAt": "ISO datetime"
 	}
 }
 ```
+
+---
+
+### GET /admin/api/audit/:id/reviews
+
+List all reviews/flags for a specific audit log entry.
+
+- **Auth:** JWT Cookie
+- **Response:**
+```json
+{
+	"reviews": [
+		{
+			"id": "uuid",
+			"auditLogId": "uuid",
+			"flagType": "suspicious_pattern",
+			"severity": "medium",
+			"reviewerType": "ai",
+			"reviewerId": "uuid",
+			"notes": "Unusual bulk update pattern detected",
+			"createdAt": "ISO datetime"
+		}
+	]
+}
+```
+
+---
+
+### POST /admin/api/audit/:id/reviews
+
+Create a review/flag on an audit log entry (as a human reviewer).
+
+- **Auth:** JWT Cookie
+- **Request Body:**
+```json
+{
+	"flag_type": "suspicious_pattern | policy_violation | data_anomaly | performance_concern | manual_review (required)",
+	"severity": "low | medium | high | critical (required)",
+	"notes": "string, max 5000 chars (optional)"
+}
+```
+- **Response (201):**
+```json
+{
+	"review": {
+		"id": "uuid",
+		"auditLogId": "uuid",
+		"flagType": "manual_review",
+		"severity": "low"
+	}
+}
+```
+
+Reviews are append-only. To resolve a flag, create a new review with `flag_type: "manual_review"` and explanatory notes.
 
 ---
 
@@ -762,20 +824,21 @@ Get aggregate statistics for the dashboard. Values are scoped by user role.
 
 ---
 
-## Agent API
+## Agent API (Executor)
 
-These endpoints are used by AI agents (or the MCP server) to query and mutate data. All require the `X-API-Key` header.
+These endpoints are used by **executor** agents to query and mutate data. All require the `X-API-Key` header and an agent with `role: "executor"`. Auditor agents receive a 403 error.
 
 ### POST /api/v1/query
 
 Execute a read-only SQL query (SELECT only).
 
-- **Auth:** API Key (`X-API-Key` header)
+- **Auth:** API Key (`X-API-Key` header, executor role)
 - **Request Body:**
 ```json
 {
 	"sql": "SELECT * FROM orders WHERE status = 'pending' LIMIT 10",
-	"database_id": "uuid (optional -- required if agent has access to multiple databases)"
+	"database_id": "uuid (optional -- required if agent has access to multiple databases)",
+	"reason": "string, max 2000 chars (optional -- agent's reasoning for this query)"
 }
 ```
 - **Response:**
@@ -805,12 +868,13 @@ curl -X POST http://localhost:3000/api/v1/query \
 
 Execute a write SQL statement (INSERT, UPDATE, DELETE). Returns before/after snapshots for audit.
 
-- **Auth:** API Key (`X-API-Key` header)
+- **Auth:** API Key (`X-API-Key` header, executor role)
 - **Request Body:**
 ```json
 {
 	"sql": "UPDATE orders SET status = 'shipped' WHERE id = 5",
-	"database_id": "uuid (optional)"
+	"database_id": "uuid (optional)",
+	"reason": "string, max 2000 chars (optional -- agent's reasoning for this mutation)"
 }
 ```
 - **Response:**
@@ -838,7 +902,7 @@ curl -X POST http://localhost:3000/api/v1/execute \
 
 List tables the agent has policy access to.
 
-- **Auth:** API Key (`X-API-Key` header)
+- **Auth:** API Key (`X-API-Key` header, executor role)
 - **Query Parameters:**
   - `database_id` -- Target database (optional if agent has single database access)
 - **Response:**
@@ -859,7 +923,7 @@ curl http://localhost:3000/api/v1/tables \
 
 Get the column schema for a specific table (runs `DESCRIBE`).
 
-- **Auth:** API Key (`X-API-Key` header)
+- **Auth:** API Key (`X-API-Key` header, executor role)
 - **Query Parameters:**
   - `database_id` -- Target database (optional if agent has single database access)
 - **Response:**
@@ -895,4 +959,166 @@ Health check for the authenticated agent.
 ```bash
 curl http://localhost:3000/api/v1/health \
 	-H "X-API-Key: aqg_your-api-key-here"
+```
+
+---
+
+## Agent API (Auditor)
+
+These endpoints are used by **auditor** agents to read audit logs and create reviews. All require the `X-API-Key` header and an agent with `role: "auditor"`. Executor agents receive a 403 error.
+
+Auditor agents are scoped to see only audit logs from sibling agents (same owner), and cannot read their own audit trail.
+
+### GET /api/v1/audit/logs
+
+Search and list audit logs with pagination and filtering.
+
+- **Auth:** API Key (`X-API-Key` header, auditor role)
+- **Query Parameters:**
+  - `page` -- Page number (default: 1)
+  - `limit` -- Results per page (default: 50, max: 100)
+  - `agent` -- Filter by agent ID
+  - `db` -- Filter by database ID
+  - `op` -- Filter by operation type (`SELECT`, `INSERT`, `UPDATE`, `DELETE`)
+  - `status` -- Filter by status (`allowed`, `denied`, `error`)
+  - `from` -- Filter logs from this ISO datetime
+  - `to` -- Filter logs until this ISO datetime
+- **Response:**
+```json
+{
+	"logs": [
+		{
+			"id": "uuid",
+			"agentId": "uuid",
+			"databaseId": "uuid",
+			"userId": "uuid",
+			"sqlQuery": "UPDATE orders SET status='shipped' WHERE id = 5",
+			"operationType": "UPDATE",
+			"status": "allowed",
+			"affectedRows": 1,
+			"dataBefore": [{"id": 5, "status": "pending"}],
+			"dataAfter": [{"id": 5, "status": "shipped"}],
+			"policyId": "uuid",
+			"denialReason": null,
+			"reason": "Customer requested expedited shipping",
+			"executionTimeMs": 45,
+			"createdAt": "ISO datetime"
+		}
+	],
+	"pagination": {
+		"page": 1,
+		"limit": 50,
+		"total": 142,
+		"totalPages": 3
+	}
+}
+```
+
+```bash
+curl "http://localhost:3000/api/v1/audit/logs?status=allowed&op=UPDATE&from=2026-05-01T00:00:00Z" \
+	-H "X-API-Key: aqg_auditor-api-key"
+```
+
+---
+
+### GET /api/v1/audit/logs/:id
+
+Get a single audit log entry with full details and its reviews.
+
+- **Auth:** API Key (`X-API-Key` header, auditor role)
+- **Response:**
+```json
+{
+	"log": {
+		"id": "uuid",
+		"agentId": "uuid",
+		"sqlQuery": "...",
+		"operationType": "UPDATE",
+		"status": "allowed",
+		"reason": "Customer requested expedited shipping",
+		"createdAt": "ISO datetime"
+	},
+	"reviews": [
+		{
+			"id": "uuid",
+			"auditLogId": "uuid",
+			"flagType": "data_anomaly",
+			"severity": "medium",
+			"reviewerType": "ai",
+			"reviewerId": "uuid",
+			"notes": "Status changed without corresponding shipment record",
+			"createdAt": "ISO datetime"
+		}
+	]
+}
+```
+
+---
+
+### POST /api/v1/audit/reviews
+
+Create a review/flag on an audit log entry.
+
+- **Auth:** API Key (`X-API-Key` header, auditor role)
+- **Request Body:**
+```json
+{
+	"audit_log_id": "uuid (required)",
+	"flag_type": "suspicious_pattern | policy_violation | data_anomaly | performance_concern | manual_review (required)",
+	"severity": "low | medium | high | critical (required)",
+	"notes": "string, max 5000 chars (optional)"
+}
+```
+- **Response (201):**
+```json
+{
+	"review": {
+		"id": "uuid",
+		"auditLogId": "uuid",
+		"flagType": "data_anomaly",
+		"severity": "medium"
+	}
+}
+```
+- **Errors:** 404 if audit log not found or not accessible (auditor cannot flag its own logs)
+
+```bash
+curl -X POST http://localhost:3000/api/v1/audit/reviews \
+	-H "Content-Type: application/json" \
+	-H "X-API-Key: aqg_auditor-api-key" \
+	-d '{"audit_log_id":"log-uuid","flag_type":"data_anomaly","severity":"medium","notes":"Unusual pattern"}'
+```
+
+---
+
+### GET /api/v1/audit/reviews
+
+List reviews created by this auditor agent.
+
+- **Auth:** API Key (`X-API-Key` header, auditor role)
+- **Query Parameters:**
+  - `page` -- Page number (default: 1)
+  - `limit` -- Results per page (default: 50, max: 100)
+- **Response:**
+```json
+{
+	"reviews": [
+		{
+			"id": "uuid",
+			"auditLogId": "uuid",
+			"flagType": "suspicious_pattern",
+			"severity": "high",
+			"reviewerType": "ai",
+			"reviewerId": "uuid",
+			"notes": "Bulk delete affecting 500+ rows",
+			"createdAt": "ISO datetime"
+		}
+	],
+	"pagination": {
+		"page": 1,
+		"limit": 50,
+		"total": 12,
+		"totalPages": 1
+	}
+}
 ```

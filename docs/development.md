@@ -55,7 +55,7 @@ agent-querygate/
 |   |   +-- jwt.ts            # JWT sign/verify
 |   |   +-- api-key.ts        # API key generation, hashing, verification
 |   |   +-- password.ts       # bcrypt hash/verify
-|   |   +-- middleware.ts     # Hono auth middleware (adminAuth, agentAuth)
+|   |   +-- middleware.ts     # Hono auth middleware (adminAuth, agentAuth, executorOnly, auditorOnly)
 |   +-- db/
 |   |   +-- schema.ts         # Drizzle ORM table definitions
 |   |   +-- connection.ts     # Admin database singleton pool
@@ -70,10 +70,11 @@ agent-querygate/
 |   |   |   +-- audit.ts      # Audit log list, export, detail
 |   |   |   +-- dashboard.ts  # Dashboard statistics
 |   |   +-- agent/
-|   |       +-- query.ts      # POST /api/v1/query (SELECT)
-|   |       +-- execute.ts    # POST /api/v1/execute (INSERT/UPDATE/DELETE)
-|   |       +-- tables.ts     # GET /api/v1/tables, /tables/:name/schema
-|   |       +-- health.ts     # GET /api/v1/health
+|   |       +-- query.ts      # POST /api/v1/query (SELECT, executor only)
+|   |       +-- execute.ts    # POST /api/v1/execute (INSERT/UPDATE/DELETE, executor only)
+|   |       +-- tables.ts     # GET /api/v1/tables, /tables/:name/schema (executor only)
+|   |       +-- health.ts     # GET /api/v1/health (all roles)
+|   |       +-- audit.ts      # Auditor agent endpoints (audit logs + reviews)
 |   +-- policy/
 |   |   +-- engine.ts         # Policy evaluation logic
 |   |   +-- blocked-keywords.ts # Dangerous SQL pattern detection
@@ -85,7 +86,7 @@ agent-querygate/
 |   +-- audit/
 |   |   +-- logger.ts         # Audit log writer
 |   +-- mcp/
-|   |   +-- server.ts         # MCP server with 5 tools
+|   |   +-- server.ts         # MCP server with role-based tool registration
 |   +-- lib/
 |       +-- types.ts          # Shared TypeScript interfaces
 |       +-- errors.ts         # AppError class and factory functions
@@ -204,7 +205,7 @@ app.route("/admin/api/my-feature", myRoutes);
 - Always use Zod for request body validation via `zValidator`.
 - Access the database via `c.get("db")` and config via `c.get("config")`.
 - Use `Errors.badRequest()`, `Errors.notFound()`, etc. from `@/lib/errors.js` for error responses.
-- Apply `adminAuth` for admin routes or `agentAuth` for agent routes.
+- Apply `adminAuth` for admin routes, `agentAuth` for agent routes, and `executorOnly`/`auditorOnly` for role-gated agent routes.
 - Generate UUIDs with `v4()` from the `uuid` package.
 - Apply resource scoping for regular users (return 404, not 403, to avoid information leakage).
 

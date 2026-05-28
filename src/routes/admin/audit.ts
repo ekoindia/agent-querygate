@@ -1,6 +1,9 @@
 import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
+import { v4 as uuidv4 } from "uuid";
 import { eq, and, gte, lte, desc, count } from "drizzle-orm";
-import { auditLogs } from "@/db/schema.js";
+import { auditLogs, auditReviews } from "@/db/schema.js";
 import { adminAuth } from "@/auth/middleware.js";
 import { Errors } from "@/lib/errors.js";
 import type { AppEnv, AuthenticatedUser } from "@/lib/types.js";
@@ -140,6 +143,7 @@ auditRoutes.get("/export", async (c) => {
 		"status",
 		"affectedRows",
 		"denialReason",
+		"reason",
 		"executionTimeMs",
 		"createdAt",
 	];
@@ -156,6 +160,7 @@ auditRoutes.get("/export", async (c) => {
 			row.status,
 			row.affectedRows ?? "",
 			row.denialReason ? csvEscape(row.denialReason) : "",
+			row.reason ? csvEscape(row.reason) : "",
 			row.executionTimeMs ?? "",
 			row.createdAt?.toISOString() ?? "",
 		];
@@ -190,5 +195,91 @@ auditRoutes.get("/:id", async (c) => {
 
 	return c.json({ log });
 });
+
+// ── GET /:id/reviews ─────────────────────────────────────────────
+auditRoutes.get("/:id/reviews", async (c) => {
+	const logId = c.req.param("id");
+	const db = c.get("db");
+	const user = c.get("user");
+
+	// Verify log exists and user has access
+	const [log] = await db
+		.select()
+		.from(auditLogs)
+		.where(eq(auditLogs.id, logId))
+		.limit(1);
+
+	if (!log) {
+		throw Errors.notFound("Audit log not found");
+	}
+
+	if (user.role === "user" && log.userId !== user.userId) {
+		throw Errors.notFound("Audit log not found");
+	}
+
+	const reviews = await db
+		.select()
+		.from(auditReviews)
+		.where(eq(auditReviews.auditLogId, logId))
+		.orderBy(desc(auditReviews.createdAt));
+
+	return c.json({ reviews });
+});
+
+// ── POST /:id/reviews ────────────────────────────────────────────
+const adminReviewSchema = z.object({
+	flag_type: z.enum(["suspicious_pattern", "policy_violation", "data_anomaly", "performance_concern", "manual_review"]),
+	severity: z.enum(["low", "medium", "high", "critical"]),
+	notes: z.string().max(5000).optional(),
+});
+
+auditRoutes.post(
+	"/:id/reviews",
+	zValidator("json", adminReviewSchema),
+	async (c) => {
+		const logId = c.req.param("id");
+		const db = c.get("db");
+		const user = c.get("user");
+		const body = c.req.valid("json");
+
+		// Verify log exists and user has access
+		const [log] = await db
+			.select()
+			.from(auditLogs)
+			.where(eq(auditLogs.id, logId))
+			.limit(1);
+
+		if (!log) {
+			throw Errors.notFound("Audit log not found");
+		}
+
+		if (user.role === "user" && log.userId !== user.userId) {
+			throw Errors.notFound("Audit log not found");
+		}
+
+		const id = uuidv4();
+		await db.insert(auditReviews).values({
+			id,
+			auditLogId: logId,
+			flagType: body.flag_type,
+			severity: body.severity,
+			reviewerType: "human",
+			reviewerId: user.userId,
+			notes: body.notes ?? null,
+		});
+
+		return c.json(
+			{
+				review: {
+					id,
+					auditLogId: logId,
+					flagType: body.flag_type,
+					severity: body.severity,
+				},
+			},
+			201,
+		);
+	},
+);
 
 export default auditRoutes;
