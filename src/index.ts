@@ -30,9 +30,13 @@ const db = getDatabase(config);
 const app = new Hono();
 
 // Middleware
+const corsOptions = {
+	origin: config.allowedOrigins,
+	credentials: true,
+};
 app.use("*", logger());
-app.use("/api/*", cors());
-app.use("/admin/api/*", cors());
+app.use("/api/*", cors(corsOptions));
+app.use("/admin/api/*", cors(corsOptions));
 
 // Inject config and db into context for all routes
 app.use("*", async (c, next) => {

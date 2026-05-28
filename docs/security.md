@@ -138,6 +138,14 @@ The query is parsed using `node-sql-parser` into a structured AST. This step:
 - Restricts operations to SELECT, INSERT, UPDATE, DELETE only
 - Extracts tables, columns, and WHERE clause presence
 
+> **Known limitation.** The query-safety guarantees rest on `node-sql-parser`'s
+> dialect coverage plus the Layer 1 blocked-keyword regexes, applied to
+> agent-supplied raw SQL. A parser/MySQL dialect mismatch is therefore part of
+> the trust boundary: pair this service with a least-privilege database account
+> (see *Database Access Principle of Least Privilege* below) so the database
+> itself enforces a hard backstop. Do not treat the policy layer as the sole
+> defense against a fully hostile agent.
+
 ### Layer 3: Policy Evaluation
 
 For each table referenced in the query:
@@ -174,7 +182,7 @@ Supported rule types:
 | Rule | Purpose | Example |
 |---|---|---|
 | `enum` | Whitelist of allowed values | `["active", "inactive", "suspended"]` |
-| `pattern` | Regex match (max 200 chars to prevent ReDoS) | `^[^@]+@[^@]+\.[^@]+$` |
+| `pattern` | Regex match (max 200 chars to prevent ReDoS; compile-checked on policy save, fails closed at runtime) | `^[^@]+@[^@]+\.[^@]+$` |
 | `min` | Minimum numeric value | `0` |
 | `max` | Maximum numeric value | `150` |
 | `notNull` | Prevents null values | -- |
@@ -185,6 +193,8 @@ When validation fails, the error response includes structured violation details 
 
 - Read queries (`SELECT`) are executed directly against the connection pool.
 - Write queries are wrapped in a transaction with before/after snapshots.
+- Snapshots are scoped to the policy's `allowedColumns` when set, so columns the
+  agent cannot write (e.g. `password`, `ssn`) are never copied into the audit log.
 - If value validation rules exist, the post-execution snapshot is validated before commit.
 - On any error or validation failure, the transaction is rolled back.
 
@@ -244,12 +254,14 @@ The CSV export feature protects against formula injection attacks by prefixing c
 - **Always enable HTTPS in production.** The JWT cookie has `secure: true` in production mode, which requires HTTPS.
 - Place the service behind a reverse proxy (Nginx, Caddy) that handles TLS termination.
 - Restrict network access to the admin panel to trusted IPs if possible.
+- **Pin CORS origins.** Set `ALLOWED_ORIGINS` to your dashboard origin(s); it defaults to the local dev origin and must not be left open to `*` in production.
 
 ### Database Access Principle of Least Privilege
 
 - Create a dedicated MySQL user for each target database connection with only the permissions needed.
 - Avoid using `root` or users with `ALL PRIVILEGES`.
 - If an agent only needs to read data, grant only `SELECT` at the MySQL level as an additional layer.
+- **Override the admin DB defaults.** `ADMIN_DB_USER` defaults to `root` with an empty password for local dev convenience only — set a dedicated, password-protected account for any non-local deployment.
 
 ### API Key Management
 

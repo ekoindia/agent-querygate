@@ -12,6 +12,15 @@ const configSchema = z.object({
 	encryptionKey: z.string().min(32),
 	port: z.coerce.number().default(3000),
 	nodeEnv: z.enum(["development", "production", "test"]).default("development"),
+	allowedOrigins: z
+		.string()
+		.default("http://localhost:5173")
+		.transform((s) =>
+			s
+				.split(",")
+				.map((o) => o.trim())
+				.filter(Boolean),
+		),
 });
 
 export type Config = z.infer<typeof configSchema>;
@@ -33,5 +42,6 @@ export function loadConfig(): Config {
 		encryptionKey: process.env.ENCRYPTION_KEY,
 		port: process.env.PORT,
 		nodeEnv: process.env.NODE_ENV,
+		allowedOrigins: process.env.ALLOWED_ORIGINS,
 	});
 }
