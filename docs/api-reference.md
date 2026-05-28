@@ -19,7 +19,7 @@ All errors return a consistent JSON shape:
 }
 ```
 
-Common error codes: `UNAUTHORIZED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `BAD_REQUEST` (400), `POLICY_DENIED` (403).
+Common error codes: `UNAUTHORIZED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `BAD_REQUEST` (400), `POLICY_DENIED` (403), `VALUE_VALIDATION_FAILED` (403).
 
 ---
 
@@ -589,7 +589,17 @@ Create a new policy for an agent-database pair.
 	"allowedColumns": ["col1", "col2"] | null,
 	"rowLimit": 100 | null,
 	"whereClauseRequired": false,
-	"customRules": {}
+	"customRules": {
+		"columnValidation": {
+			"column_name": [
+				{ "type": "enum", "values": ["val1", "val2"] },
+				{ "type": "pattern", "regex": "^regex$" },
+				{ "type": "min", "value": 0 },
+				{ "type": "max", "value": 100 },
+				{ "type": "notNull" }
+			]
+		}
+	}
 }
 ```
 - **Response (201):**
@@ -603,16 +613,26 @@ Create a new policy for an agent-database pair.
 		"allowedColumns": null,
 		"rowLimit": null,
 		"whereClauseRequired": false,
-		"customRules": {}
+		"customRules": { ... }
 	}
 }
 ```
+
+> **Note:** The `customRules` field in the response contains the validation rules if configured, or `{}` if none are set.
 
 ```bash
 curl -X POST http://localhost:3000/admin/api/agents/{agentId}/databases/{dbId}/policies \
 	-b cookies.txt \
 	-H "Content-Type: application/json" \
 	-d '{"tableName":"orders","allowedOperations":["SELECT"],"rowLimit":1000,"whereClauseRequired":false}'
+```
+
+```bash
+# Create a policy with value validation rules
+curl -X POST http://localhost:3000/admin/api/agents/{agentId}/databases/{dbId}/policies \
+	-b cookies.txt \
+	-H "Content-Type: application/json" \
+	-d '{"tableName":"users","allowedOperations":["SELECT","UPDATE"],"allowedColumns":["status","email","age"],"whereClauseRequired":true,"customRules":{"columnValidation":{"status":[{"type":"enum","values":["active","inactive","suspended"]}],"email":[{"type":"notNull"},{"type":"pattern","regex":"^[^@]+@[^@]+\\.[^@]+$"}],"age":[{"type":"min","value":0},{"type":"max","value":150}]}}}'
 ```
 
 ---
@@ -630,7 +650,17 @@ Update an existing policy.
 	"allowedColumns": ["col1"] | null (optional),
 	"rowLimit": 50 | null (optional),
 	"whereClauseRequired": true (optional),
-	"customRules": {} (optional)
+	"customRules": {
+		"columnValidation": {
+			"column_name": [
+				{ "type": "enum", "values": ["val1", "val2"] },
+				{ "type": "pattern", "regex": "^regex$" },
+				{ "type": "min", "value": 0 },
+				{ "type": "max", "value": 100 },
+				{ "type": "notNull" }
+			]
+		}
+	} (optional)
 }
 ```
 - **Response:**
@@ -888,6 +918,7 @@ Execute a write SQL statement (INSERT, UPDATE, DELETE). Returns before/after sna
 - **Errors:**
   - 400: SQL parse failure, SELECT query sent to this endpoint
   - 403: Policy denied (same reasons as /query, plus row limit exceeded)
+  - 403 (VALUE_VALIDATION_FAILED): Value validation failed -- response includes `violations` array with column, rejected value, rule type, and allowed constraint so the agent can self-correct
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/execute \

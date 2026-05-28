@@ -262,22 +262,26 @@ Raw SQL
 checkBlockedKeywords() -- reject DDL, GRANT, multi-statement, LOAD DATA, INTO OUTFILE
   |
   v
-parseSql() -- AST via node-sql-parser, extract operation/tables/columns/hasWhere
+parseSql() -- AST via node-sql-parser, extract operation/tables/columns/hasWhere/values
   |
   v
-evaluatePolicy() -- check each table against policy records (default-deny)
+evaluatePolicy() -- check table policies + pre-exec value validation (literal values)
   |
   v
 getPolicyRowLimit() -- determine row limit for write operations
   |
   v
 countAffectedRows() -- pre-flight count for row limit enforcement
+  |
+  v
+executeWriteQuery() -- transaction with post-exec value validation before COMMIT
 ```
 
 Files:
 - `blocked-keywords.ts` -- regex-based dangerous pattern detection
 - `sql-parser.ts` -- SQL to structured `ParsedQuery` via `node-sql-parser`
 - `engine.ts` -- policy evaluation logic and row limit extraction
+- `value-validation.ts` -- column-level value validation rules, AST value extraction, pre/post-execution validation
 
 ### Query Executor (`src/query/`)
 
@@ -289,7 +293,8 @@ Handles actual SQL execution against target databases:
   2. `captureBeforeSnapshot()` -- SELECT matching rows before mutation
   3. Execute the write query
   4. `captureAfterSnapshot()` -- SELECT matching rows after mutation
-  5. `COMMIT` (or `ROLLBACK` on error)
+  5. `validateValuePostExec()` -- validate snapshot against column rules (ROLLBACK if violated)
+  6. `COMMIT` (or `ROLLBACK` on error/validation failure)
 
 Files:
 - `executor.ts` -- `executeReadQuery()`, `executeWriteQuery()`, `countAffectedRows()`

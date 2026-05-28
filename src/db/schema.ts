@@ -10,6 +10,7 @@ import {
 	uniqueIndex,
 	varchar,
 } from "drizzle-orm/mysql-core";
+import type { CustomRules } from "@/policy/value-validation.js";
 
 // ── Enums ──────────────────────────────────────────────────────────
 
@@ -131,7 +132,7 @@ export const policies = mysqlTable("policies", {
 	allowedColumns: json("allowed_columns").$type<string[] | null>().default(null),
 	rowLimit: int("row_limit"),
 	whereClauseRequired: boolean("where_clause_required").notNull().default(false),
-	customRules: json("custom_rules").$type<Record<string, unknown>>().notNull().default({}),
+	customRules: json("custom_rules").$type<CustomRules>().notNull().default({}),
 	createdAt: datetime("created_at").notNull().$defaultFn(() => new Date()),
 	updatedAt: datetime("updated_at").notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
 });

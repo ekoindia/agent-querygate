@@ -2,6 +2,8 @@
  * Application-level error with HTTP status code and machine-readable code.
  */
 export class AppError extends Error {
+	public details?: Record<string, unknown>;
+
 	constructor(
 		public statusCode: number,
 		message: string,
@@ -19,4 +21,9 @@ export const Errors = {
 	notFound: (msg = "Not found") => new AppError(404, msg, "NOT_FOUND"),
 	badRequest: (msg: string) => new AppError(400, msg, "BAD_REQUEST"),
 	policyDenied: (msg: string) => new AppError(403, msg, "POLICY_DENIED"),
+	valueValidationFailed: (msg: string, details: Record<string, unknown>) => {
+		const err = new AppError(403, msg, "VALUE_VALIDATION_FAILED");
+		err.details = details;
+		return err;
+	},
 } as const;

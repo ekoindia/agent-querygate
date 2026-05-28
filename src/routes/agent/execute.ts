@@ -7,6 +7,7 @@ import { checkBlockedKeywords } from "@/policy/blocked-keywords.js";
 import { parseSql } from "@/policy/sql-parser.js";
 import { evaluatePolicy, getPolicyRowLimit } from "@/policy/engine.js";
 import type { PolicyRecord } from "@/policy/engine.js";
+import { parseCustomRules } from "@/policy/value-validation.js";
 import { getTargetPool } from "@/query/pool-manager.js";
 import { executeWriteQuery, countAffectedRows } from "@/query/executor.js";
 import { writeAuditLog } from "@/audit/logger.js";
@@ -84,6 +85,7 @@ executeRoutes.post(
 			allowedColumns: row.allowedColumns ?? null,
 			rowLimit: row.rowLimit,
 			whereClauseRequired: row.whereClauseRequired,
+			customRules: parseCustomRules(row.customRules),
 		}));
 
 		// 6. Evaluate policy
@@ -98,6 +100,16 @@ executeRoutes.post(
 				policyResult,
 				reason: body.reason,
 			});
+
+			if (policyResult.valueViolations?.length) {
+				throw Errors.valueValidationFailed(
+					policyResult.denialReason ?? "Value validation failed",
+					{
+						violations: policyResult.valueViolations,
+						unvalidatable: policyResult.unvalidatableColumns ?? [],
+					},
+				);
+			}
 			throw Errors.policyDenied(policyResult.denialReason ?? "Policy denied");
 		}
 
@@ -131,8 +143,16 @@ executeRoutes.post(
 		}
 
 		// 8. Execute write query
+		const firstTablePolicy = policyRecords.find(
+			(p) => p.tableName === parsed.tables[0],
+		);
+		const columnValidationRules =
+			firstTablePolicy?.customRules?.columnValidation;
+
 		const startTime = Date.now();
-		const snapshot = await executeWriteQuery(pool, parsed);
+		const snapshot = await executeWriteQuery(pool, parsed, {
+			columnValidationRules,
+		});
 		const executionTimeMs = Date.now() - startTime;
 
 		await writeAuditLog(db, {

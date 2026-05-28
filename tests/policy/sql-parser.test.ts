@@ -67,4 +67,53 @@ describe("parseSql", () => {
 		const result = parseSql(sql);
 		expect(result.originalSql).toBe(sql);
 	});
+
+	describe("extractedValues", () => {
+		it("populates extractedValues for UPDATE with literals", () => {
+			const result = parseSql("UPDATE users SET status = 'active', age = 25 WHERE id = 1");
+			expect(result.extractedValues).toBeDefined();
+			expect(result.extractedValues).toHaveLength(2);
+			expect(result.extractedValues![0]).toMatchObject({
+				column: "status",
+				kind: "literal",
+				value: "active",
+			});
+			expect(result.extractedValues![1]).toMatchObject({
+				column: "age",
+				kind: "literal",
+				value: 25,
+			});
+		});
+
+		it("populates extractedValues for INSERT", () => {
+			const result = parseSql("INSERT INTO users (name, age) VALUES ('Alice', 30)");
+			expect(result.extractedValues).toBeDefined();
+			expect(result.extractedValues).toHaveLength(2);
+			expect(result.extractedValues![0]).toMatchObject({
+				column: "name",
+				kind: "literal",
+				value: "Alice",
+			});
+		});
+
+		it("marks expression values as unvalidatable", () => {
+			const result = parseSql("UPDATE products SET price = price * 1.1 WHERE id = 1");
+			expect(result.extractedValues).toBeDefined();
+			expect(result.extractedValues![0]).toMatchObject({
+				column: "price",
+				kind: "unvalidatable",
+				rawType: "binary_expr",
+			});
+		});
+
+		it("does not populate extractedValues for SELECT", () => {
+			const result = parseSql("SELECT * FROM users");
+			expect(result.extractedValues).toBeUndefined();
+		});
+
+		it("does not populate extractedValues for DELETE", () => {
+			const result = parseSql("DELETE FROM users WHERE id = 1");
+			expect(result.extractedValues).toBeUndefined();
+		});
+	});
 });

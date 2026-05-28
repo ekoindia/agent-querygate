@@ -155,11 +155,38 @@ For write operations (INSERT/UPDATE/DELETE), if a `rowLimit` is configured:
 2. If the affected row count exceeds the limit, the operation is denied
 3. The denial is logged in the audit trail
 
+### Layer 5: Value Validation
+
+The policy engine validates not just which columns can be written, but what values are acceptable. This closes the gap where an agent with column-level access could write semantically dangerous values (e.g., `UPDATE users SET role = 'superadmin'`).
+
+Value validation uses a **hybrid approach** with two phases:
+
+**Phase 1: Pre-execution (literal values)**
+
+Before any SQL executes, literal values in `UPDATE SET` and `INSERT VALUES` are extracted from the SQL AST and validated against rules defined in the policy's `customRules.columnValidation` field. Non-literal values (expressions like `NOW()`, `price * 1.1`, subqueries) are flagged as unvalidatable and deferred to Phase 2.
+
+**Phase 2: Post-execution (before COMMIT)**
+
+After the write query executes inside a transaction but before `COMMIT`, the actual data snapshot is validated against the same rules. If validation fails, the transaction is rolled back. This catches expression-based values that couldn't be validated pre-execution.
+
+Supported rule types:
+
+| Rule | Purpose | Example |
+|---|---|---|
+| `enum` | Whitelist of allowed values | `["active", "inactive", "suspended"]` |
+| `pattern` | Regex match (max 200 chars to prevent ReDoS) | `^[^@]+@[^@]+\.[^@]+$` |
+| `min` | Minimum numeric value | `0` |
+| `max` | Maximum numeric value | `150` |
+| `notNull` | Prevents null values | -- |
+
+When validation fails, the error response includes structured violation details (column, rejected value, rule type, and what the rule expects) so AI agents can self-correct and retry with valid values.
+
 ### Execution Isolation
 
 - Read queries (`SELECT`) are executed directly against the connection pool.
 - Write queries are wrapped in a transaction with before/after snapshots.
-- On any error, the transaction is rolled back.
+- If value validation rules exist, the post-execution snapshot is validated before commit.
+- On any error or validation failure, the transaction is rolled back.
 
 ## Audit Trail
 

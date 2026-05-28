@@ -1,6 +1,13 @@
 import type { Pool, RowDataPacket, ResultSetHeader } from "mysql2/promise";
 import type { ParsedQuery, QueryResult, SnapshotResult } from "@/lib/types.js";
+import type { ColumnValidationRules } from "@/policy/value-validation.js";
+import { validateValuePostExec } from "@/policy/value-validation.js";
+import { Errors } from "@/lib/errors.js";
 import { captureBeforeSnapshot, captureAfterSnapshot } from "./snapshot.js";
+
+export interface WriteQueryOptions {
+	columnValidationRules?: ColumnValidationRules;
+}
 
 /**
  * Executes a read-only (SELECT) query against the target database.
@@ -28,6 +35,7 @@ export async function executeReadQuery(
 export async function executeWriteQuery(
 	pool: Pool,
 	query: ParsedQuery,
+	options?: WriteQueryOptions,
 ): Promise<SnapshotResult> {
 	const connection = await pool.getConnection();
 
@@ -40,6 +48,23 @@ export async function executeWriteQuery(
 		const affectedRows = result.affectedRows;
 
 		const dataAfter = await captureAfterSnapshot(pool, query);
+
+		if (options?.columnValidationRules && dataAfter.length > 0) {
+			const postResult = validateValuePostExec(
+				dataAfter,
+				options.columnValidationRules,
+			);
+			if (!postResult.valid) {
+				await connection.rollback();
+				const first = postResult.violations[0]!;
+				throw Errors.valueValidationFailed(
+					`Post-execution validation failed for column '${first.column}': ${first.message}`,
+					{
+						violations: postResult.violations,
+					},
+				);
+			}
+		}
 
 		await connection.commit();
 

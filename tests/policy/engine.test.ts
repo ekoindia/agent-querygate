@@ -1,6 +1,7 @@
 import { evaluatePolicy, getPolicyRowLimit } from "@/policy/engine";
 import type { ParsedQuery } from "@/lib/types";
 import type { PolicyRecord } from "@/policy/engine";
+import type { CustomRules } from "@/policy/value-validation";
 
 const makePolicy = (overrides: Partial<PolicyRecord> = {}): PolicyRecord => ({
 	id: "policy-1",
@@ -105,6 +106,101 @@ describe("evaluatePolicy", () => {
 		const result = evaluatePolicy(query, [makePolicy()]);
 		expect(result.allowed).toBe(false);
 		expect(result.denialReason).toBe("No access policy for table 'orders'");
+	});
+
+	describe("value validation via customRules", () => {
+		const customRules: CustomRules = {
+			columnValidation: {
+				status: [{ type: "enum", values: ["active", "inactive", "suspended"] }],
+				age: [{ type: "min", value: 0 }, { type: "max", value: 150 }],
+			},
+		};
+
+		it("allows query when values conform to rules", () => {
+			const result = evaluatePolicy(
+				makeQuery({
+					operation: "UPDATE",
+					columns: ["status"],
+					extractedValues: [
+						{ column: "status", kind: "literal", value: "active" },
+					],
+				}),
+				[makePolicy({ allowedOperations: ["UPDATE"], customRules })],
+			);
+			expect(result.allowed).toBe(true);
+		});
+
+		it("denies query when value violates enum rule", () => {
+			const result = evaluatePolicy(
+				makeQuery({
+					operation: "UPDATE",
+					columns: ["status"],
+					extractedValues: [
+						{ column: "status", kind: "literal", value: "superadmin" },
+					],
+				}),
+				[makePolicy({ allowedOperations: ["UPDATE"], customRules })],
+			);
+			expect(result.allowed).toBe(false);
+			expect(result.denialReason).toContain("Value validation failed");
+			expect(result.valueViolations).toBeDefined();
+			expect(result.valueViolations).toHaveLength(1);
+			expect(result.valueViolations![0].column).toBe("status");
+			expect(result.valueViolations![0].constraint).toEqual({
+				values: ["active", "inactive", "suspended"],
+			});
+		});
+
+		it("denies query when value violates numeric range", () => {
+			const result = evaluatePolicy(
+				makeQuery({
+					operation: "UPDATE",
+					columns: ["age"],
+					extractedValues: [
+						{ column: "age", kind: "literal", value: -5 },
+					],
+				}),
+				[makePolicy({ allowedOperations: ["UPDATE"], customRules })],
+			);
+			expect(result.allowed).toBe(false);
+			expect(result.valueViolations![0].rule).toBe("min");
+		});
+
+		it("reports unvalidatable columns without denying", () => {
+			const result = evaluatePolicy(
+				makeQuery({
+					operation: "UPDATE",
+					columns: ["status"],
+					extractedValues: [
+						{ column: "status", kind: "unvalidatable", rawType: "function" },
+					],
+				}),
+				[makePolicy({ allowedOperations: ["UPDATE"], customRules })],
+			);
+			expect(result.allowed).toBe(true);
+		});
+
+		it("allows query when customRules is empty (backward compat)", () => {
+			const result = evaluatePolicy(
+				makeQuery({
+					operation: "UPDATE",
+					columns: ["status"],
+					extractedValues: [
+						{ column: "status", kind: "literal", value: "anything" },
+					],
+				}),
+				[makePolicy({ allowedOperations: ["UPDATE"] })],
+			);
+			expect(result.allowed).toBe(true);
+		});
+
+		it("allows query when no extractedValues present", () => {
+			const result = evaluatePolicy(
+				makeQuery({ operation: "UPDATE", columns: ["status"] }),
+				[makePolicy({ allowedOperations: ["UPDATE"], customRules })],
+			);
+			expect(result.allowed).toBe(true);
+		});
 	});
 });
 

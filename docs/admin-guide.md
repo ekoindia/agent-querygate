@@ -136,6 +136,76 @@ Policies define what an agent can do on each table within a specific database. W
 
 This allows the agent to read any column and update only the `status` column, limited to 10 rows per query, and only with a WHERE clause.
 
+### Value Validation
+
+Value validation constrains **what values** agents can write to columns, not just **which columns** they can access. This prevents AI agents from writing semantically dangerous values (e.g., setting `role = 'superadmin'`) even when they have column-level access.
+
+Configure value validation in the **Custom Rules** field of a policy, under the `columnValidation` key:
+
+```json
+{
+	"columnValidation": {
+		"status": [
+			{ "type": "enum", "values": ["active", "inactive", "suspended"] }
+		],
+		"email": [
+			{ "type": "notNull" },
+			{ "type": "pattern", "regex": "^[^@]+@[^@]+\\.[^@]+$" }
+		],
+		"age": [
+			{ "type": "min", "value": 0 },
+			{ "type": "max", "value": 150 }
+		]
+	}
+}
+```
+
+**Available rule types:**
+
+| Rule | Purpose | Parameters |
+|---|---|---|
+| `enum` | Value must be one of the listed options | `values`: array of allowed strings, numbers, booleans, or null |
+| `pattern` | Value must match the regex | `regex`: regex string (max 200 chars), optional `flags` |
+| `min` | Numeric value must be >= threshold | `value`: minimum number |
+| `max` | Numeric value must be <= threshold | `value`: maximum number |
+| `notNull` | Value must not be null | -- |
+
+Multiple rules can be applied to the same column. All rules must pass for a value to be accepted.
+
+**How it works:**
+
+1. **Pre-execution:** Literal values in the SQL (strings, numbers, booleans, null) are validated before the query runs. If a literal value violates a rule, the query is denied immediately.
+2. **Post-execution:** After the query executes (but before the transaction commits), the actual database values are validated. If validation fails, the transaction is rolled back. This catches values from expressions, functions, and subqueries that couldn't be checked pre-execution.
+
+**Self-correction:** When validation fails, the error response includes detailed violation information (which column failed, what value was rejected, what the rule expects). This enables AI agents to understand the constraint and retry with a corrected value.
+
+**Example policy with value validation:**
+
+- Table: `users`
+- Operations: `SELECT`, `UPDATE`
+- Columns: `["status", "email", "age"]`
+- WHERE Required: true
+- Custom Rules:
+  ```json
+  {
+  	"columnValidation": {
+  		"status": [{ "type": "enum", "values": ["active", "inactive", "suspended"] }],
+  		"email": [{ "type": "notNull" }, { "type": "pattern", "regex": "^[^@]+@[^@]+\\.[^@]+$" }],
+  		"age": [{ "type": "min", "value": 0 }, { "type": "max", "value": 150 }]
+  	}
+  }
+  ```
+
+This allows the agent to update only `status`, `email`, and `age` columns, with a WHERE clause, and the values must conform to the defined constraints.
+
+**Edge cases to be aware of:**
+
+- **Expression values** (e.g., `NOW()`, `price * 1.1`, subqueries): Cannot be validated pre-execution. They are validated post-execution before the transaction commits.
+- **INSERT ... SELECT**: All values come from a subquery and are validated post-execution only.
+- **Columns without rules**: Any value is allowed. Only columns with explicit rules are constrained.
+- **Regex patterns**: Capped at 200 characters to prevent denial-of-service via complex patterns. Invalid regex patterns are skipped with a warning.
+- **Empty customRules**: When `customRules` is `{}` or omitted, no value validation is performed (backward compatible).
+
 ### Policy Evaluation Logic
 
 When a query arrives:

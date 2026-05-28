@@ -1,6 +1,7 @@
 import { Parser } from "node-sql-parser";
 import { Errors } from "@/lib/errors";
 import type { ParsedQuery } from "@/lib/types";
+import { extractValuesFromAst } from "./value-validation.js";
 
 const parser = new Parser();
 
@@ -54,13 +55,19 @@ export function parseSql(sql: string): ParsedQuery {
 	const columns = extractColumns(ast, operation);
 	const hasWhere = ast.where != null;
 
-	return {
+	const result: ParsedQuery = {
 		operation,
 		tables,
 		columns,
 		hasWhere,
 		originalSql: sql,
 	};
+
+	if (operation === "INSERT" || operation === "UPDATE") {
+		result.extractedValues = extractValuesFromAst(ast, operation);
+	}
+
+	return result;
 }
 
 /** Extracts table names from the AST based on operation type. */

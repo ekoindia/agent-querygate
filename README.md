@@ -78,7 +78,7 @@ graph TD
 
     subgraph Hono Server
         SP[SQL Parser]
-        PE[Policy Engine<br><i>table/column/op access rules</i>]
+        PE[Policy Engine<br><i>table/column/op access<br>rules + validation</i>]
         AL[Audit Logger]
     end
 
@@ -143,7 +143,7 @@ graph TD
 | Backend  | Hono, Drizzle ORM, mysql2, node-sql-parser, Zod, JWT |
 | Frontend | React 19, Vite 8, shadcn/ui, Tailwind CSS v4         |
 | Auth     | bcryptjs (passwords), JWT (sessions), API keys       |
-| MCP      | @modelcontextprotocol/sdk (stdio transport)           |
+| MCP      | @modelcontextprotocol/sdk (stdio transport)          |
 | Crypto   | Node crypto (AES-256-GCM)                            |
 | Testing  | Vitest                                               |
 

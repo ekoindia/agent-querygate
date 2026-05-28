@@ -6,6 +6,7 @@ import { eq, and } from "drizzle-orm";
 import { policies, agentDatabaseAccess, agents } from "@/db/schema.js";
 import { adminAuth } from "@/auth/middleware.js";
 import { Errors } from "@/lib/errors.js";
+import { customRulesSchema } from "@/policy/value-validation.js";
 import type { AppEnv, AuthenticatedUser } from "@/lib/types.js";
 
 async function verifyAccessOwnership(
@@ -67,7 +68,7 @@ const createPolicySchema = z.object({
 	allowedColumns: z.array(z.string()).nullable().default(null),
 	rowLimit: z.number().int().positive().nullable().default(null),
 	whereClauseRequired: z.boolean().default(false),
-	customRules: z.record(z.string(), z.unknown()).default({}),
+	customRules: customRulesSchema,
 });
 
 policyRoutes.post(
@@ -107,7 +108,7 @@ policyRoutes.post(
 			allowedColumns: body.allowedColumns,
 			rowLimit: body.rowLimit,
 			whereClauseRequired: body.whereClauseRequired,
-			customRules: body.customRules as Record<string, unknown>,
+			customRules: body.customRules,
 		});
 
 		return c.json(
@@ -137,7 +138,7 @@ const updatePolicySchema = z.object({
 	allowedColumns: z.array(z.string()).nullable().optional(),
 	rowLimit: z.number().int().positive().nullable().optional(),
 	whereClauseRequired: z.boolean().optional(),
-	customRules: z.record(z.string(), z.unknown()).optional(),
+	customRules: customRulesSchema.optional(),
 });
 
 policyRoutes.put(

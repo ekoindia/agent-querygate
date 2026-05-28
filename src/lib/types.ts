@@ -1,3 +1,5 @@
+import type { ExtractedValue, ValueViolation, UnvalidatableColumn } from "@/policy/value-validation.js";
+
 /** Represents a parsed SQL query with extracted metadata. */
 export interface ParsedQuery {
 	operation: "SELECT" | "INSERT" | "UPDATE" | "DELETE";
@@ -5,6 +7,7 @@ export interface ParsedQuery {
 	columns: string[];
 	hasWhere: boolean;
 	originalSql: string;
+	extractedValues?: ExtractedValue[];
 }
 
 /** Result of checking a query against agent policies. */
@@ -12,6 +15,8 @@ export interface PolicyCheckResult {
 	allowed: boolean;
 	policyId?: string;
 	denialReason?: string;
+	valueViolations?: ValueViolation[];
+	unvalidatableColumns?: UnvalidatableColumn[];
 }
 
 /** Before/after data snapshots for mutation queries. */

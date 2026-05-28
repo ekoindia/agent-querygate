@@ -1,4 +1,6 @@
 import type { ParsedQuery, PolicyCheckResult } from "@/lib/types";
+import type { CustomRules } from "./value-validation.js";
+import { validateValuePreExec } from "./value-validation.js";
 
 /** Represents a policy record governing access to a specific table. */
 export interface PolicyRecord {
@@ -8,6 +10,7 @@ export interface PolicyRecord {
 	allowedColumns: string[] | null;
 	rowLimit: number | null;
 	whereClauseRequired: boolean;
+	customRules?: CustomRules;
 }
 
 /** Operations that require a WHERE clause when whereClauseRequired is true. */
@@ -75,6 +78,27 @@ export function evaluatePolicy(
 				allowed: false,
 				denialReason: `WHERE clause required for ${query.operation} on table '${table}'`,
 			};
+		}
+
+		// Value validation (pre-execution)
+		if (
+			policy.customRules?.columnValidation &&
+			query.extractedValues &&
+			query.extractedValues.length > 0
+		) {
+			const valResult = validateValuePreExec(
+				query.extractedValues,
+				policy.customRules.columnValidation,
+			);
+			if (!valResult.valid) {
+				const first = valResult.violations[0]!;
+				return {
+					allowed: false,
+					denialReason: `Value validation failed for column '${first.column}': ${first.message}`,
+					valueViolations: valResult.violations,
+					unvalidatableColumns: valResult.unvalidatable,
+				};
+			}
 		}
 	}
 
