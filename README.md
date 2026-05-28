@@ -22,6 +22,7 @@ A security broker between AI agents and MySQL databases. Provides policy-based g
 - **SQL injection prevention** -- AST-based SQL parsing with blocked keyword detection
 - **Row limit enforcement** -- policies can cap how many rows a write operation affects
 - **WHERE clause requirements** -- force agents to include WHERE on UPDATE/DELETE
+- **Value validation** -- per-column rules on write values (enum, regex pattern, min/max, not-null), checked before and after execution
 
 ---
 
