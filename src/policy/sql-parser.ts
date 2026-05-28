@@ -1,4 +1,5 @@
-import { Parser } from "node-sql-parser";
+import pkg from "node-sql-parser";
+const { Parser } = pkg;
 import { Errors } from "@/lib/errors";
 import type { ParsedQuery } from "@/lib/types";
 import { extractValuesFromAst } from "./value-validation.js";
