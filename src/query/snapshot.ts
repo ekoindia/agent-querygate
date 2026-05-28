@@ -1,5 +1,6 @@
 import type { Pool, RowDataPacket } from "mysql2/promise";
 import type { ParsedQuery } from "@/lib/types.js";
+import { quoteIdent } from "@/lib/identifier.js";
 
 /** Maximum number of rows to include in a before/after snapshot. */
 const SNAPSHOT_ROW_LIMIT = 1000;
@@ -14,19 +15,36 @@ function extractWhereClause(sql: string): string | null {
 }
 
 /**
- * Builds a SELECT query to snapshot the rows affected by a mutation query.
- * Returns null if the table name or WHERE clause cannot be determined.
+ * Builds the projection list for a snapshot SELECT. When the policy restricts
+ * columns, only those columns are captured so restricted data (e.g. password,
+ * ssn) never lands in the audit log. A null/empty allow-list falls back to "*".
  */
-export function buildSnapshotSelect(query: ParsedQuery): string | null {
+function buildProjection(allowedColumns?: string[] | null): string {
+	if (!allowedColumns || allowedColumns.length === 0) {
+		return "*";
+	}
+	return allowedColumns.map(quoteIdent).join(", ");
+}
+
+/**
+ * Builds a SELECT query to snapshot the rows affected by a mutation query.
+ * Returns null if the table name cannot be determined. When allowedColumns is
+ * provided, the snapshot is scoped to those columns instead of all columns.
+ */
+export function buildSnapshotSelect(
+	query: ParsedQuery,
+	allowedColumns?: string[] | null,
+): string | null {
 	const table = query.tables[0];
 	if (!table) {
 		return null;
 	}
 
+	const projection = buildProjection(allowedColumns);
 	const whereClause = extractWhereClause(query.originalSql);
 	const whereFragment = whereClause ? `WHERE ${whereClause}` : "";
 
-	return `SELECT * FROM \`${table}\` ${whereFragment} LIMIT ${SNAPSHOT_ROW_LIMIT}`;
+	return `SELECT ${projection} FROM ${quoteIdent(table)} ${whereFragment} LIMIT ${SNAPSHOT_ROW_LIMIT}`;
 }
 
 /**
@@ -36,12 +54,13 @@ export function buildSnapshotSelect(query: ParsedQuery): string | null {
 export async function captureBeforeSnapshot(
 	pool: Pool,
 	query: ParsedQuery,
+	allowedColumns?: string[] | null,
 ): Promise<Record<string, unknown>[]> {
 	if (query.operation === "INSERT") {
 		return [];
 	}
 
-	const snapshotSql = buildSnapshotSelect(query);
+	const snapshotSql = buildSnapshotSelect(query, allowedColumns);
 	if (!snapshotSql) {
 		return [];
 	}
@@ -57,12 +76,13 @@ export async function captureBeforeSnapshot(
 export async function captureAfterSnapshot(
 	pool: Pool,
 	query: ParsedQuery,
+	allowedColumns?: string[] | null,
 ): Promise<Record<string, unknown>[]> {
 	if (query.operation === "DELETE") {
 		return [];
 	}
 
-	const snapshotSql = buildSnapshotSelect(query);
+	const snapshotSql = buildSnapshotSelect(query, allowedColumns);
 	if (!snapshotSql) {
 		return [];
 	}

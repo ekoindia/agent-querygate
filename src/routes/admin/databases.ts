@@ -7,6 +7,7 @@ import mysql from "mysql2/promise";
 import { databases } from "@/db/schema.js";
 import { adminAuth } from "@/auth/middleware.js";
 import { encrypt, decrypt } from "@/lib/crypto.js";
+import { quoteIdent } from "@/lib/identifier.js";
 import { Errors } from "@/lib/errors.js";
 import { testConnection, removePool } from "@/query/pool-manager.js";
 import type { AppEnv, AuthenticatedUser } from "@/lib/types.js";
@@ -247,7 +248,7 @@ databaseRoutes.get("/:id/introspect", async (c) => {
 
 		const schema: Record<string, unknown[]> = {};
 		for (const table of tables) {
-			const [columns] = await connection.query(`DESCRIBE \`${table}\``);
+			const [columns] = await connection.query(`DESCRIBE ${quoteIdent(table)}`);
 			schema[table] = columns as unknown[];
 		}
 

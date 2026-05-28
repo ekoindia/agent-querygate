@@ -152,6 +152,7 @@ executeRoutes.post(
 		const startTime = Date.now();
 		const snapshot = await executeWriteQuery(pool, parsed, {
 			columnValidationRules,
+			allowedColumns: firstTablePolicy?.allowedColumns ?? null,
 		});
 		const executionTimeMs = Date.now() - startTime;
 

@@ -253,6 +253,9 @@ auditRoutes.post(
 			throw Errors.notFound("Audit log not found");
 		}
 
+		// By design: admins/superadmins may review any log; only "user" role is
+		// scoped to its own logs. Reviews are append-only, so cross-log review
+		// access cannot mutate or hide existing audit history.
 		if (user.role === "user" && log.userId !== user.userId) {
 			throw Errors.notFound("Audit log not found");
 		}

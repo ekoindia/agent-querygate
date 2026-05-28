@@ -7,6 +7,8 @@ import { captureBeforeSnapshot, captureAfterSnapshot } from "./snapshot.js";
 
 export interface WriteQueryOptions {
 	columnValidationRules?: ColumnValidationRules;
+	/** Policy-allowed columns; when set, snapshots capture only these columns. */
+	allowedColumns?: string[] | null;
 }
 
 /**
@@ -42,12 +44,20 @@ export async function executeWriteQuery(
 	try {
 		await connection.beginTransaction();
 
-		const dataBefore = await captureBeforeSnapshot(pool, query);
+		const dataBefore = await captureBeforeSnapshot(
+			pool,
+			query,
+			options?.allowedColumns,
+		);
 
 		const [result] = await connection.query<ResultSetHeader>(query.originalSql);
 		const affectedRows = result.affectedRows;
 
-		const dataAfter = await captureAfterSnapshot(pool, query);
+		const dataAfter = await captureAfterSnapshot(
+			pool,
+			query,
+			options?.allowedColumns,
+		);
 
 		if (options?.columnValidationRules && dataAfter.length > 0) {
 			const postResult = validateValuePostExec(

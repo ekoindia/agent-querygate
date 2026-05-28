@@ -209,13 +209,17 @@ function checkRule(
 		}
 		case "pattern": {
 			if (value === null || value === undefined) return null;
+			let re: RegExp;
 			try {
-				const re = new RegExp(rule.regex, rule.flags);
-				if (!re.test(String(value))) {
-					return `value ${JSON.stringify(value)} does not match pattern: ${rule.regex}`;
-				}
+				re = new RegExp(rule.regex, rule.flags);
 			} catch {
-				return null;
+				// Fail closed: an uncompilable pattern rejects the value rather
+				// than silently allowing it. Patterns are compile-checked at the
+				// policy write path, so this only triggers on legacy bad data.
+				return `value ${JSON.stringify(value)} rejected: invalid validation pattern: ${rule.regex}`;
+			}
+			if (!re.test(String(value))) {
+				return `value ${JSON.stringify(value)} does not match pattern: ${rule.regex}`;
 			}
 			return null;
 		}
@@ -353,6 +357,24 @@ const validationRuleSchema = z.discriminatedUnion("type", [
 
 export const columnValidationSchema = z
 	.record(z.string(), z.array(validationRuleSchema).min(1))
+	.superRefine((rules, ctx) => {
+		// Reject uncompilable pattern regexes at the policy write path so a
+		// broken rule can never be persisted and later fail open at runtime.
+		for (const [column, columnRules] of Object.entries(rules)) {
+			columnRules.forEach((rule, idx) => {
+				if (rule.type !== "pattern") return;
+				try {
+					new RegExp(rule.regex, rule.flags);
+				} catch {
+					ctx.addIssue({
+						code: "custom",
+						message: `invalid regex for column '${column}': ${rule.regex}`,
+						path: [column, idx, "regex"],
+					});
+				}
+			});
+		}
+	})
 	.optional();
 
 export const customRulesSchema = z

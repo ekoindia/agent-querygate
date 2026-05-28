@@ -5,6 +5,7 @@ import { agentAuth, executorOnly } from "@/auth/middleware.js";
 import { getTargetPool } from "@/query/pool-manager.js";
 import { agentDatabaseAccess, policies } from "@/db/schema.js";
 import { Errors } from "@/lib/errors.js";
+import { quoteIdent } from "@/lib/identifier.js";
 import type { AppEnv, AuthenticatedAgent } from "@/lib/types.js";
 import type { Config } from "@/config.js";
 import { resolveDatabase } from "./query.js";
@@ -105,7 +106,7 @@ tableRoutes.get("/tables/:name/schema", agentAuth, executorOnly, async (c) => {
 		passwordEncrypted: dbRecord.passwordEncrypted,
 	}, config.encryptionKey);
 
-	const [rows] = await pool.query<RowDataPacket[]>(`DESCRIBE \`${tableName}\``);
+	const [rows] = await pool.query<RowDataPacket[]>(`DESCRIBE ${quoteIdent(tableName)}`);
 
 	return c.json({ columns: rows });
 });

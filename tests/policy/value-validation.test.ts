@@ -3,6 +3,7 @@ import {
 	validateValuePreExec,
 	validateValuePostExec,
 	parseCustomRules,
+	columnValidationSchema,
 } from "@/policy/value-validation";
 import type {
 	ColumnValidationRules,
@@ -14,7 +15,10 @@ import { Parser } from "node-sql-parser";
 const parser = new Parser();
 
 function getAst(sql: string): Record<string, unknown> {
-	return parser.astify(sql, { database: "MySQL" }) as Record<string, unknown>;
+	return parser.astify(sql, { database: "MySQL" }) as unknown as Record<
+		string,
+		unknown
+	>;
 }
 
 // ── extractValuesFromAst ──────────────────────────────────────────
@@ -216,6 +220,18 @@ describe("validateValuePreExec", () => {
 			const result = validateValuePreExec(values, rules);
 			expect(result.valid).toBe(true);
 		});
+
+		it("fails closed when the pattern regex is uncompilable", () => {
+			const badRules: ColumnValidationRules = {
+				email: [{ type: "pattern", regex: "[" }],
+			};
+			const values: ExtractedValue[] = [
+				{ column: "email", kind: "literal", value: "anything" },
+			];
+			const result = validateValuePreExec(values, badRules);
+			expect(result.valid).toBe(false);
+			expect(result.violations[0].rule).toBe("pattern");
+		});
 	});
 
 	describe("min/max rules", () => {
@@ -415,5 +431,23 @@ describe("parseCustomRules", () => {
 		const result = parseCustomRules(raw as Record<string, unknown>);
 		expect(result.columnValidation).toBeDefined();
 		expect((result as Record<string, unknown>).unknownKey).toBeUndefined();
+	});
+});
+
+// ── columnValidationSchema (policy write-path) ────────────────────
+
+describe("columnValidationSchema", () => {
+	it("accepts a valid pattern regex", () => {
+		const result = columnValidationSchema.safeParse({
+			email: [{ type: "pattern", regex: "^[^@]+@[^@]+\\.[^@]+$" }],
+		});
+		expect(result.success).toBe(true);
+	});
+
+	it("rejects an uncompilable pattern regex at save time", () => {
+		const result = columnValidationSchema.safeParse({
+			email: [{ type: "pattern", regex: "[" }],
+		});
+		expect(result.success).toBe(false);
 	});
 });
