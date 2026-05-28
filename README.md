@@ -63,33 +63,75 @@ Open **http://localhost:5173/setup** to create the initial superadmin account.
 
 ## Architecture
 
-```
-                                  +------------------+
-                                  |   Target MySQL   |
-                                  |   Databases      |
-                                  +--------+---------+
-                                           ^
-                                           | encrypted connections
-                                           |
-+---------------+    REST API     +--------+---------+     +-----------+
-|  AI Agents    +---------------->|   Hono Server    +---->| Admin DB  |
-|  (Claude,     |  POST /query    |                  |     | (MySQL)   |
-|   custom)     |  POST /execute  |  +------------+  |     +-----------+
-+---------------+                 |  | Policy     |  |
-                                  |  | Engine     |  |
-+---------------+    MCP/stdio    |  +------------+  |
-|  MCP Clients  +---------------->|  | SQL Parser |  |
-|  (Claude      |  mysql_query    |  +------------+  |
-|   Desktop)    |  mysql_execute  |  | Audit      |  |
-+---------------+                 |  | Logger     |  |
-                                  +--------+---------+
-                                           ^
-                                           | JWT auth
-                                           |
-                                  +--------+---------+
-                                  |   Admin Users    |
-                                  |   (React SPA)    |
-                                  +------------------+
+```mermaid
+graph TD
+
+    subgraph Executor Agents
+        EA[Executor Agents<br><i>Claude, custom</i>]
+        EM[MCP Clients<br><i>Claude Desktop</i>]
+    end
+
+    subgraph Auditor Agents
+        AA[Auditor Agents<br><i>Claude, custom</i>]
+        AM[MCP Clients<br><i>Claude Desktop</i>]
+    end
+
+    subgraph Hono Server
+        SP[SQL Parser]
+        PE[Policy Engine<br><i>table/column/op access rules</i>]
+        AL[Audit Logger]
+    end
+
+    TDB[(Target MySQL<br>Databases)]
+    ADB[(Admin DB<br>MySQL)]
+    ADM[Admin Users<br>React SPA]
+
+    EA -- "REST API<br>POST /query<br>POST /execute" --> SP
+    EM -- "MCP/stdio<br>mysql_query<br>mysql_execute" --> SP
+
+    AA -- "REST API<br>GET /audit/*<br>POST /reviews" --> AL
+    AM -- "MCP/stdio<br>audit_*" --> AL
+
+    SP --> PE
+    PE --> AL
+    AL -- "encrypted connections" --> TDB
+    AL --> ADB
+    ADM -- "JWT auth" --> SP
+
+%% ASCII version (visible only in raw markdown):
+%%                                   +------------------+
+%%                                   |   Target MySQL   |
+%%                                   |   Databases      |
+%%                                   +--------+---------+
+%%                                            ^
+%%                                            | encrypted connections
+%%                                            |
+%% +---------------+    REST API     +--------+---------+     +-----------+
+%% |  Executor     +---------------->|   Hono Server    +---->| Admin DB  |
+%% |  Agents       |  POST /query    |                  |     | (MySQL)   |
+%% |  (Claude,     |  POST /execute  |  +------------+  |     +-----------+
+%% |   custom)     |                 |  | SQL Parser |  |
+%% +---------------+    MCP/stdio    |  +------------+  |
+%% |  MCP Clients  +---------------->|  | Policy     |  |
+%% |  (Claude      |  mysql_query    |  | Engine     |  |
+%% |   Desktop)    |  mysql_execute  |  +------------+  |
+%% +---------------+                 |  | Audit      |  |
+%%                                   |  | Logger     |  |
+%% +---------------+    REST API     |  +------------+  |
+%% |  Auditor      +---------------->|                  |
+%% |  Agents       |  GET /audit/*   |                  |
+%% |  (Claude,     |  POST /reviews  |                  |
+%% |   custom)     |                 |                  |
+%% +---------------+    MCP/stdio    |                  |
+%% |  MCP Clients  +---------------->|                  |
+%% |  (Claude      |  audit_*        +--------+---------+
+%% |   Desktop)    |                          ^
+%% +---------------+                          | JWT auth
+%%                                            |
+%%                                   +--------+---------+
+%%                                   |   Admin Users    |
+%%                                   |   (React SPA)    |
+%%                                   +------------------+
 ```
 
 ---
