@@ -51,14 +51,58 @@ mysql -u root -e "CREATE DATABASE querygate_admin"
 # 4. Run migrations
 npm run db:migrate
 
-# 5. Start the backend (port 3000)
+# 5. Start the backend API (port 3000) -- serves REST API; in dev the UI comes from Vite
 npm run dev
 
-# 6. In a separate terminal, start the frontend (port 5173)
+# 6. In a separate terminal, start the Vite frontend dev server (port 5173)
+#    HMR + proxies /api and /admin/api calls to the backend on 3000
 npm run dev:frontend
 ```
 
 Open **http://localhost:5173/setup** to create the initial superadmin account.
+
+> In development use **5173**, not 3000. Port 3000 serves the last `vite build` output, which is stale (or empty) while you are working on the frontend. See [Running the App](#running-the-app) for the full dev-vs-production model.
+
+---
+
+## Running the App
+
+The backend and frontend are **separate processes**. Which ones you run depends on whether you are developing or deploying.
+
+### Development
+
+Run both, in two terminals:
+
+```bash
+# Terminal 1 -- backend API (run db:migrate once first)
+npm run db:migrate   # only when migrations are pending
+npm run dev          # Hono API on :3000, hot reload
+
+# Terminal 2 -- frontend dev server
+npm run dev:frontend # Vite on :5173, HMR, proxies API -> :3000
+```
+
+Open **http://localhost:5173**.
+
+The Vite dev server (5173) serves the UI with hot module reload and forwards every `/api` and `/admin/api` request to the backend on 3000. Port 3000 *also* serves a UI, but only the last `vite build` output -- always use 5173 while developing the frontend.
+
+### Production
+
+No Vite. Build once, then run a single server:
+
+```bash
+npm run build   # compiles backend to dist/ and builds the SPA into frontend/dist/
+npm run start   # one server on :3000 serving the REST API AND the built SPA
+```
+
+Open **http://localhost:3000**. The Vite dev server (5173) is not used in production.
+
+### Port reference
+
+| Port | Process | When | Serves |
+|------|---------|------|--------|
+| 3000 | Backend (`npm run dev` / `npm run start`) | dev + prod | REST API; built SPA from `frontend/dist` |
+| 5173 | Vite (`npm run dev:frontend`) | dev only | SPA with HMR; proxies `/api`, `/admin/api` -> 3000 |
 
 ---
 
@@ -226,19 +270,38 @@ All admin endpoints require a JWT `Authorization: Bearer <token>` header (except
 | Method | Endpoint                        | Description                         |
 |--------|---------------------------------|-------------------------------------|
 | POST   | `/admin/api/auth/setup`         | Create initial superadmin           |
+| GET    | `/admin/api/auth/setup-status`  | Check whether setup is complete     |
 | POST   | `/admin/api/auth/login`         | Authenticate and receive JWT        |
+| POST   | `/admin/api/auth/logout`        | Invalidate the current session      |
+| GET    | `/admin/api/auth/me`            | Get the current authenticated user  |
 | GET    | `/admin/api/users`              | List users                          |
-| POST   | `/admin/api/users`              | Create user (admin+ only)          |
+| POST   | `/admin/api/users`              | Create user (admin+ only)           |
+| PUT    | `/admin/api/users/:id`          | Update a user                       |
+| DELETE | `/admin/api/users/:id`          | Delete a user                       |
 | GET    | `/admin/api/databases`          | List registered databases           |
 | POST   | `/admin/api/databases`          | Register a target database          |
+| PUT    | `/admin/api/databases/:id`      | Update a registered database        |
+| DELETE | `/admin/api/databases/:id`      | Delete a registered database        |
+| POST   | `/admin/api/databases/:id/test-connection` | Test connectivity to a target DB |
+| GET    | `/admin/api/databases/:id/introspect`      | Introspect a target DB's tables/columns |
 | GET    | `/admin/api/agents`             | List agents                         |
 | POST   | `/admin/api/agents`             | Create agent with role (returns API key) |
-| GET    | `/admin/api/agents/:id/policies`| List policies for an agent          |
-| POST   | `/admin/api/agents/:id/policies`| Create access policy                |
+| PUT    | `/admin/api/agents/:id`         | Update an agent                     |
+| DELETE | `/admin/api/agents/:id`         | Delete an agent                     |
+| POST   | `/admin/api/agents/:id/regenerate-key` | Regenerate an agent's API key  |
+| GET    | `/admin/api/agents/:id/databases`      | List databases an agent can access |
+| POST   | `/admin/api/agents/:id/databases/:dbId` | Grant an agent access to a database |
+| DELETE | `/admin/api/agents/:id/databases/:dbId` | Revoke an agent's database access |
+| GET    | `/admin/api/agents/:agentId/databases/:dbId/policies` | List policies for an agent on a database |
+| POST   | `/admin/api/agents/:agentId/databases/:dbId/policies` | Create an access policy |
+| PUT    | `/admin/api/policies/:id`       | Update an access policy             |
+| DELETE | `/admin/api/policies/:id`       | Delete an access policy             |
 | GET    | `/admin/api/audit`              | Query audit logs                    |
+| GET    | `/admin/api/audit/export`       | Export audit logs                   |
+| GET    | `/admin/api/audit/:id`          | Get an audit log entry's detail     |
 | GET    | `/admin/api/audit/:id/reviews`  | List reviews for an audit log       |
 | POST   | `/admin/api/audit/:id/reviews`  | Create a review on an audit log     |
-| GET    | `/admin/api/dashboard`          | Dashboard statistics                |
+| GET    | `/admin/api/dashboard/stats`    | Dashboard statistics                |
 
 ---
 
@@ -317,6 +380,7 @@ Set `AQG_AGENT_ROLE` to `auditor` for an auditor agent's MCP server.
 | `ENCRYPTION_KEY`   | AES-256 key for DB passwords (min 32)  | **required**           |
 | `PORT`             | Server listen port                     | `3000`                 |
 | `NODE_ENV`         | Environment mode                       | `development`          |
+| `ALLOWED_ORIGINS`  | Comma-separated CORS origins (pin in prod) | `http://localhost:5173` |
 
 ---
 
@@ -324,18 +388,24 @@ Set `AQG_AGENT_ROLE` to `auditor` for an auditor agent's MCP server.
 
 | Script              | Command              | Description                              |
 |---------------------|-----------------------|------------------------------------------|
-| `npm run dev`       | `tsx watch src/index.ts` | Start backend in dev mode with hot reload |
+| `npm run dev`       | `tsx watch --env-file=.env src/index.ts` | Start backend in dev mode with hot reload |
 | `npm run dev:frontend` | `cd frontend && npm run dev` | Start frontend dev server (Vite)    |
 | `npm run build`     | `tsc + vite build`   | Build backend and frontend for production |
-| `npm run start`     | `node dist/index.js` | Run production build                     |
+| `npm run start`     | `node --env-file=.env dist/index.js` | Run production build                     |
 | `npm run test`      | `vitest run`         | Run test suite                           |
 | `npm run test:watch`| `vitest`             | Run tests in watch mode                  |
 | `npm run db:generate`| `drizzle-kit generate` | Generate migration files from schema   |
-| `npm run db:migrate`| `tsx src/db/migrate.ts` | Apply pending migrations               |
+| `npm run db:migrate`| `tsx --env-file=.env src/db/migrate.ts` | Apply pending migrations               |
 | `npm run db:studio` | `drizzle-kit studio` | Open Drizzle Studio GUI                  |
+
+Backend scripts load `.env` via Node's native `--env-file` flag (no dotenv dependency). The frontend (`dev:frontend`) needs no `.env`: Vite loads its own `frontend/.env*` files and only ever sees `VITE_`-prefixed values, never backend secrets.
 
 ---
 
 ## License
 
-MIT
+Released under the [MIT License](./LICENSE).
+
+## Security
+
+To report a vulnerability, see [SECURITY.md](./SECURITY.md). Do not open public issues for security reports.
