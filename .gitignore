@@ -21,3 +21,11 @@ dist
 
 # Coverage
 coverage/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Editor directories
+.vscode/
+.idea/
+*.swp
