@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { agents, agentDatabaseAccess, databases } from "@/db/schema.js";
 import { generateApiKey, hashApiKey } from "@/auth/api-key.js";
 import { adminAuth } from "@/auth/middleware.js";
@@ -42,7 +42,82 @@ agentRoutes.get("/", async (c) => {
 		.from(agents)
 		.where(filter);
 
-	return c.json({ agents: rows });
+	const agentIds = rows.map((r) => r.id);
+
+	const accessRows = agentIds.length
+		? await db
+				.select({
+					id: agentDatabaseAccess.id,
+					agentId: agentDatabaseAccess.agentId,
+					databaseId: agentDatabaseAccess.databaseId,
+					dbId: databases.id,
+					dbName: databases.name,
+					dbHost: databases.host,
+					dbPort: databases.port,
+					dbDbName: databases.dbName,
+				})
+				.from(agentDatabaseAccess)
+				.innerJoin(
+					databases,
+					eq(agentDatabaseAccess.databaseId, databases.id),
+				)
+				.where(inArray(agentDatabaseAccess.agentId, agentIds))
+		: [];
+
+	const accessByAgent = new Map<string, unknown[]>();
+	for (const a of accessRows) {
+		const list = accessByAgent.get(a.agentId) ?? [];
+		list.push({
+			id: a.id,
+			agentId: a.agentId,
+			databaseId: a.databaseId,
+			database: {
+				id: a.dbId,
+				name: a.dbName,
+				host: a.dbHost,
+				port: a.dbPort,
+				dbName: a.dbDbName,
+			},
+		});
+		accessByAgent.set(a.agentId, list);
+	}
+
+	const agentsWithDatabases = rows.map((r) => ({
+		...r,
+		databases: accessByAgent.get(r.id) ?? [],
+	}));
+
+	return c.json({ agents: agentsWithDatabases });
+});
+
+// ── GET /:id ──────────────────────────────────────────────────────
+agentRoutes.get("/:id", async (c) => {
+	const agentId = c.req.param("id");
+	const db = c.get("db");
+	const user = c.get("user");
+
+	const [agent] = await db
+		.select({
+			id: agents.id,
+			userId: agents.userId,
+			name: agents.name,
+			role: agents.role,
+			isActive: agents.isActive,
+			createdAt: agents.createdAt,
+		})
+		.from(agents)
+		.where(eq(agents.id, agentId))
+		.limit(1);
+
+	if (!agent) {
+		throw Errors.notFound("Agent not found");
+	}
+
+	if (user.role === "user" && agent.userId !== user.userId) {
+		throw Errors.notFound("Agent not found");
+	}
+
+	return c.json(agent);
 });
 
 // ── POST / ────────────────────────────────────────────────────────
@@ -199,6 +274,77 @@ agentRoutes.get("/:id/databases", async (c) => {
 
 	return c.json({ databases: rows });
 });
+
+// ── PUT /:id/databases ────────────────────────────────────────────
+const setDatabasesSchema = z.object({
+	databaseIds: z.array(z.string()).default([]),
+});
+
+agentRoutes.put(
+	"/:id/databases",
+	zValidator("json", setDatabasesSchema),
+	async (c) => {
+		const agentId = c.req.param("id");
+		const { databaseIds } = c.req.valid("json");
+		const db = c.get("db");
+		const user = c.get("user");
+
+		const [agent] = await db
+			.select()
+			.from(agents)
+			.where(eq(agents.id, agentId))
+			.limit(1);
+
+		if (!agent) {
+			throw Errors.notFound("Agent not found");
+		}
+
+		if (user.role === "user" && agent.userId !== user.userId) {
+			throw Errors.notFound("Agent not found");
+		}
+
+		// Verify every requested database exists, and (for non-admins) is owned.
+		if (databaseIds.length > 0) {
+			const dbRecords = await db
+				.select()
+				.from(databases)
+				.where(inArray(databases.id, databaseIds));
+
+			if (dbRecords.length !== databaseIds.length) {
+				throw Errors.notFound("Database not found");
+			}
+
+			if (
+				user.role === "user" &&
+				dbRecords.some((d) => d.userId !== user.userId)
+			) {
+				throw Errors.notFound("Database not found");
+			}
+		}
+
+		// Replace the agent's entire access set.
+		await db
+			.delete(agentDatabaseAccess)
+			.where(eq(agentDatabaseAccess.agentId, agentId));
+
+		if (databaseIds.length > 0) {
+			await db.insert(agentDatabaseAccess).values(
+				databaseIds.map((databaseId) => ({
+					id: uuidv4(),
+					agentId,
+					databaseId,
+				})),
+			);
+		}
+
+		const rows = await db
+			.select()
+			.from(agentDatabaseAccess)
+			.where(eq(agentDatabaseAccess.agentId, agentId));
+
+		return c.json({ databases: rows });
+	},
+);
 
 // ── POST /:id/databases/:dbId ─────────────────────────────────────
 agentRoutes.post("/:id/databases/:dbId", async (c) => {

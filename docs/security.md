@@ -99,7 +99,7 @@ The user management endpoints (`/admin/api/users/*`) use an additional `adminOnl
 Target database passwords are encrypted before storage:
 
 - **Algorithm:** AES-256-GCM (authenticated encryption)
-- **Key:** 32-byte key provided via the `ENCRYPTION_KEY` environment variable (hex-encoded, 64 hex characters)
+- **Key:** 32-byte AES key derived via SHA-256 from the `ENCRYPTION_KEY` environment variable (any secret string, min 32 chars). SHA-256 is a single-pass derivation -- use a high-entropy random value (e.g. `openssl rand -base64 32`), not a low-entropy passphrase.
 - **IV:** 12 random bytes generated per encryption operation
 - **Storage format:** `ivHex:authTagHex:ciphertextHex` (colon-separated)
 - **Authentication tag:** 16 bytes, prevents tampering
@@ -246,7 +246,7 @@ The CSV export feature protects against formula injection attacks by prefixing c
 ### Secrets Management
 
 - **JWT_SECRET:** Use at least 64 characters of cryptographically random data. Generate with `openssl rand -base64 48`.
-- **ENCRYPTION_KEY:** Must be exactly 32 bytes (64 hex characters). Generate with `openssl rand -hex 32`.
+- **ENCRYPTION_KEY:** Any random secret, min 32 chars (SHA-256-derived to the AES key). Generate with `openssl rand -base64 32`.
 - Store secrets in environment variables or a secrets manager. Never commit them to version control.
 
 ### Network Security

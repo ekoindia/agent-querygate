@@ -320,6 +320,28 @@ curl -X POST http://localhost:3000/admin/api/databases \
 
 ---
 
+### GET /admin/api/databases/:id
+
+Get a single registered database. The encrypted password is never returned.
+
+- **Auth:** JWT Cookie
+- **Response:**
+```json
+{
+	"id": "uuid",
+	"userId": "uuid",
+	"name": "string",
+	"host": "string",
+	"port": 3306,
+	"dbName": "string",
+	"username": "string",
+	"createdAt": "ISO datetime",
+	"updatedAt": "ISO datetime"
+}
+```
+
+---
+
 ### PUT /admin/api/databases/:id
 
 Update database connection details. Clears the cached connection pool on change.
@@ -369,17 +391,16 @@ Test connectivity to the target database (ping).
 
 ### GET /admin/api/databases/:id/introspect
 
-Retrieve the full schema (all tables and their column definitions) from the target database.
+Retrieve the table names and their column names from the target database.
 
 - **Auth:** JWT Cookie
 - **Response:**
 ```json
 {
+	"tables": ["users", "orders"],
 	"schema": {
-		"users": [
-			{ "Field": "id", "Type": "int", "Null": "NO", "Key": "PRI", "Default": null, "Extra": "auto_increment" }
-		],
-		"orders": [...]
+		"users": ["id", "email", "created_at"],
+		"orders": ["id", "user_id", "total", "status"]
 	}
 }
 ```
@@ -392,7 +413,7 @@ All agent endpoints require JWT Cookie auth. Regular users see only their own ag
 
 ### GET /admin/api/agents
 
-List agents (scoped by user role).
+List agents (scoped by user role). Each agent includes its assigned databases.
 
 - **Auth:** JWT Cookie
 - **Response:**
@@ -405,7 +426,21 @@ List agents (scoped by user role).
 			"name": "string",
 			"role": "executor | auditor",
 			"isActive": true,
-			"createdAt": "ISO datetime"
+			"createdAt": "ISO datetime",
+			"databases": [
+				{
+					"id": "uuid",
+					"agentId": "uuid",
+					"databaseId": "uuid",
+					"database": {
+						"id": "uuid",
+						"name": "string",
+						"host": "string",
+						"port": 3306,
+						"dbName": "string"
+					}
+				}
+			]
 		}
 	]
 }
@@ -445,6 +480,25 @@ curl -X POST http://localhost:3000/admin/api/agents \
 	-b cookies.txt \
 	-H "Content-Type: application/json" \
 	-d '{"name":"Claude Agent","role":"executor"}'
+```
+
+---
+
+### GET /admin/api/agents/:id
+
+Get a single agent.
+
+- **Auth:** JWT Cookie
+- **Response:**
+```json
+{
+	"id": "uuid",
+	"userId": "uuid",
+	"name": "string",
+	"role": "executor | auditor",
+	"isActive": true,
+	"createdAt": "ISO datetime"
+}
 ```
 
 ---
@@ -515,6 +569,33 @@ List database access records for an agent.
 
 ---
 
+### PUT /admin/api/agents/:id/databases
+
+Replace an agent's entire set of database access in one call. Existing access not in the
+request is removed; an empty array clears all access.
+
+- **Auth:** JWT Cookie
+- **Request Body:**
+```json
+{
+	"databaseIds": ["uuid", "uuid"]
+}
+```
+- **Response:**
+```json
+{
+	"databases": [
+		{
+			"id": "uuid",
+			"agentId": "uuid",
+			"databaseId": "uuid"
+		}
+	]
+}
+```
+
+---
+
 ### POST /admin/api/agents/:id/databases/:dbId
 
 Grant an agent access to a database. Idempotent -- returns existing record if already granted.
@@ -551,27 +632,25 @@ Policies control what an agent can do on a specific table within a specific data
 
 ### GET /admin/api/agents/:agentId/databases/:dbId/policies
 
-List all policies for an agent-database pair.
+List all policies for an agent-database pair. Returns a bare array.
 
 - **Auth:** JWT Cookie
 - **Response:**
 ```json
-{
-	"policies": [
-		{
-			"id": "uuid",
-			"agentDatabaseAccessId": "uuid",
-			"tableName": "orders",
-			"allowedOperations": ["SELECT", "INSERT"],
-			"allowedColumns": ["id", "status", "total"] | null,
-			"rowLimit": 100 | null,
-			"whereClauseRequired": false,
-			"customRules": {},
-			"createdAt": "ISO datetime",
-			"updatedAt": "ISO datetime"
-		}
-	]
-}
+[
+	{
+		"id": "uuid",
+		"agentDatabaseAccessId": "uuid",
+		"tableName": "orders",
+		"allowedOperations": ["SELECT", "INSERT"],
+		"allowedColumns": ["id", "status", "total"] | null,
+		"rowLimit": 100 | null,
+		"whereClauseRequired": false,
+		"customRules": {},
+		"createdAt": "ISO datetime",
+		"updatedAt": "ISO datetime"
+	}
+]
 ```
 
 ---

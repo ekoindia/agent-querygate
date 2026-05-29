@@ -70,8 +70,8 @@ export function Dashboard() {
 	useEffect(() => {
 		const fetchStats = async () => {
 			try {
-				const data = await api.get<DashboardStats>("/dashboard/stats");
-				setStats(data);
+				const data = await api.get<{ stats: DashboardStats }>("/dashboard/stats");
+				setStats(data.stats);
 			} catch (err) {
 				setError(err instanceof Error ? err.message : "Failed to load stats");
 			} finally {

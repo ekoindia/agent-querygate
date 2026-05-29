@@ -38,7 +38,7 @@ cp .env.example .env
 | `ADMIN_DB_USER` | MySQL user for the admin database | `root` | No |
 | `ADMIN_DB_PASSWORD` | MySQL password for the admin database | (empty) | No |
 | `JWT_SECRET` | Secret for signing JWT tokens (min 16 chars) | -- | **Yes** |
-| `ENCRYPTION_KEY` | Hex-encoded 32-byte key for AES-256-GCM encryption | -- | **Yes** |
+| `ENCRYPTION_KEY` | Secret string for AES-256-GCM (min 32 chars; SHA-256-derived to a 32-byte key) | -- | **Yes** |
 | `PORT` | HTTP server port | `3000` | No |
 | `NODE_ENV` | Environment mode (`development`, `production`, `test`) | `development` | No |
 
@@ -48,8 +48,8 @@ cp .env.example .env
 # Generate a JWT secret (64 random characters)
 openssl rand -base64 48
 
-# Generate an encryption key (32 bytes as hex = 64 hex characters)
-openssl rand -hex 32
+# Generate an encryption key (any high-entropy random secret; it is SHA-256-derived)
+openssl rand -base64 32
 ```
 
 ## Database Setup

@@ -74,8 +74,8 @@ export function Databases() {
 
 	const fetchDatabases = async () => {
 		try {
-			const data = await api.get<Database[]>("/databases");
-			setDatabases(data);
+			const data = await api.get<{ databases: Database[] }>("/databases");
+			setDatabases(data.databases);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to load databases");
 		} finally {

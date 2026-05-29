@@ -92,11 +92,11 @@ export function Agents() {
 	const fetchData = async () => {
 		try {
 			const [agentsData, dbsData] = await Promise.all([
-				api.get<AgentWithDatabases[]>("/agents"),
-				api.get<DatabaseType[]>("/databases"),
+				api.get<{ agents: AgentWithDatabases[] }>("/agents"),
+				api.get<{ databases: DatabaseType[] }>("/databases"),
 			]);
-			setAgents(agentsData);
-			setDatabases(dbsData);
+			setAgents(agentsData.agents);
+			setDatabases(dbsData.databases);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to load data");
 		} finally {

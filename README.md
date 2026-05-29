@@ -280,16 +280,19 @@ All admin endpoints require a JWT `Authorization: Bearer <token>` header (except
 | DELETE | `/admin/api/users/:id`          | Delete a user                       |
 | GET    | `/admin/api/databases`          | List registered databases           |
 | POST   | `/admin/api/databases`          | Register a target database          |
+| GET    | `/admin/api/databases/:id`      | Get a single registered database    |
 | PUT    | `/admin/api/databases/:id`      | Update a registered database        |
 | DELETE | `/admin/api/databases/:id`      | Delete a registered database        |
 | POST   | `/admin/api/databases/:id/test-connection` | Test connectivity to a target DB |
 | GET    | `/admin/api/databases/:id/introspect`      | Introspect a target DB's tables/columns |
-| GET    | `/admin/api/agents`             | List agents                         |
+| GET    | `/admin/api/agents`             | List agents (with assigned databases) |
 | POST   | `/admin/api/agents`             | Create agent with role (returns API key) |
+| GET    | `/admin/api/agents/:id`         | Get a single agent                  |
 | PUT    | `/admin/api/agents/:id`         | Update an agent                     |
 | DELETE | `/admin/api/agents/:id`         | Delete an agent                     |
 | POST   | `/admin/api/agents/:id/regenerate-key` | Regenerate an agent's API key  |
 | GET    | `/admin/api/agents/:id/databases`      | List databases an agent can access |
+| PUT    | `/admin/api/agents/:id/databases`      | Replace an agent's full database-access set (bulk) |
 | POST   | `/admin/api/agents/:id/databases/:dbId` | Grant an agent access to a database |
 | DELETE | `/admin/api/agents/:id/databases/:dbId` | Revoke an agent's database access |
 | GET    | `/admin/api/agents/:agentId/databases/:dbId/policies` | List policies for an agent on a database |
@@ -377,7 +380,7 @@ Set `AQG_AGENT_ROLE` to `auditor` for an auditor agent's MCP server.
 | `ADMIN_DB_USER`    | Admin database user                    | `root`                 |
 | `ADMIN_DB_PASSWORD`| Admin database password                | (empty)                |
 | `JWT_SECRET`       | Secret for signing JWTs (min 16 chars) | **required**           |
-| `ENCRYPTION_KEY`   | AES-256 key for DB passwords (min 32)  | **required**           |
+| `ENCRYPTION_KEY`   | Secret string (min 32 chars) for DB-password encryption; SHA-256-derived to a 32-byte AES-256 key | **required**           |
 | `PORT`             | Server listen port                     | `3000`                 |
 | `NODE_ENV`         | Environment mode                       | `development`          |
 | `ALLOWED_ORIGINS`  | Comma-separated CORS origins (pin in prod) | `http://localhost:5173` |

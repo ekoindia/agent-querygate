@@ -42,10 +42,12 @@ interface AuditFilters {
 }
 
 interface PaginatedAuditResponse {
-	data: AuditLog[];
-	total: number;
-	page: number;
-	limit: number;
+	logs: AuditLog[];
+	pagination: {
+		total: number;
+		page: number;
+		limit: number;
+	};
 }
 
 const emptyFilters: AuditFilters = {
@@ -82,11 +84,11 @@ export function Audit() {
 	const fetchDropdowns = async () => {
 		try {
 			const [agentsData, dbsData] = await Promise.all([
-				api.get<Agent[]>("/agents"),
-				api.get<Database[]>("/databases"),
+				api.get<{ agents: Agent[] }>("/agents"),
+				api.get<{ databases: Database[] }>("/databases"),
 			]);
-			setAgents(agentsData);
-			setDatabases(dbsData);
+			setAgents(agentsData.agents);
+			setDatabases(dbsData.databases);
 		} catch {
 			// Non-critical; filters just won't have dropdown options
 		}
@@ -110,8 +112,8 @@ export function Audit() {
 			const result = await api.get<PaginatedAuditResponse>(
 				`/audit?${params.toString()}`,
 			);
-			setLogs(result.data);
-			setTotal(result.total);
+			setLogs(result.logs);
+			setTotal(result.pagination.total);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to load audit logs");
 		} finally {

@@ -58,7 +58,7 @@ policyRoutes.get("/agents/:agentId/databases/:dbId/policies", async (c) => {
 		.from(policies)
 		.where(eq(policies.agentDatabaseAccessId, access.id));
 
-	return c.json({ policies: rows });
+	return c.json(rows);
 });
 
 // ── POST /agents/:agentId/databases/:dbId/policies ────────────────

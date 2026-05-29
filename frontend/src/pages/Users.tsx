@@ -72,8 +72,8 @@ export function Users() {
 
 	const fetchUsers = async () => {
 		try {
-			const data = await api.get<User[]>("/users");
-			setUsers(data);
+			const data = await api.get<{ users: User[] }>("/users");
+			setUsers(data.users);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to load users");
 		} finally {

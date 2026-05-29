@@ -52,6 +52,39 @@ databaseRoutes.get("/", async (c) => {
 	return c.json({ databases: rows });
 });
 
+// ── GET /:id ──────────────────────────────────────────────────────
+databaseRoutes.get("/:id", async (c) => {
+	const dbId = c.req.param("id");
+	const db = c.get("db");
+	const user = c.get("user");
+
+	const [record] = await db
+		.select({
+			id: databases.id,
+			userId: databases.userId,
+			name: databases.name,
+			host: databases.host,
+			port: databases.port,
+			dbName: databases.dbName,
+			username: databases.username,
+			createdAt: databases.createdAt,
+			updatedAt: databases.updatedAt,
+		})
+		.from(databases)
+		.where(eq(databases.id, dbId))
+		.limit(1);
+
+	if (!record) {
+		throw Errors.notFound("Database not found");
+	}
+
+	if (user.role === "user" && record.userId !== user.userId) {
+		throw Errors.notFound("Database not found");
+	}
+
+	return c.json(record);
+});
+
 // ── POST / ────────────────────────────────────────────────────────
 const createDbSchema = z.object({
 	name: z.string().min(1),
@@ -246,13 +279,15 @@ databaseRoutes.get("/:id/introspect", async (c) => {
 			(row) => Object.values(row)[0],
 		);
 
-		const schema: Record<string, unknown[]> = {};
+		const schema: Record<string, string[]> = {};
 		for (const table of tables) {
 			const [columns] = await connection.query(`DESCRIBE ${quoteIdent(table)}`);
-			schema[table] = columns as unknown[];
+			schema[table] = (columns as Array<{ Field: string }>).map(
+				(col) => col.Field,
+			);
 		}
 
-		return c.json({ schema });
+		return c.json({ tables, schema });
 	} catch (err) {
 		const message = err instanceof Error ? err.message : "Connection failed";
 		throw Errors.badRequest(`Introspection failed: ${message}`);
