@@ -5,7 +5,7 @@ A security broker between AI agents and MySQL databases. Provides policy-based g
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Node](https://img.shields.io/badge/Node-20+-brightgreen)
-[![codecov](https://codecov.io/gh/anthropics/agent-querygate/branch/main/graph/badge.svg)](https://codecov.io/gh/anthropics/agent-querygate)
+[![codecov](https://codecov.io/gh/ekoindia/agent-querygate/branch/main/graph/badge.svg)](https://codecov.io/gh/ekoindia/agent-querygate)
 
 ---
 
@@ -38,7 +38,7 @@ A security broker between AI agents and MySQL databases. Provides policy-based g
 
 ```bash
 # 1. Clone and install dependencies
-git clone https://github.com/anthropics/agent-querygate.git
+git clone https://github.com/ekoindia/agent-querygate.git
 cd agent-querygate
 npm install && cd frontend && npm install && cd ..
 
