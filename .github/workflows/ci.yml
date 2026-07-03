@@ -12,8 +12,6 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -26,13 +24,15 @@ jobs:
 
       - run: npm test -- --coverage
 
-      # Skipped until the CODECOV_TOKEN secret is set (tokenless upload is
-      # rejected). Add the secret to activate; no workflow change needed.
+      # Non-fatal: without the CODECOV_TOKEN secret the upload is rejected
+      # (tokenless not allowed) but must not fail CI. Add the secret to
+      # activate. Token stays scoped to this step — never exposed to npm.
       - uses: codecov/codecov-action@v5
-        if: env.CODECOV_TOKEN != ''
         with:
           files: coverage/lcov.info
-          fail_ci_if_error: true
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   # Promote tested code: fast-forward the `release` branch to this commit.
   # The intranet VM auto-deploys whatever `release` points at (builds locally —
