@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm test -- --coverage
+
+      - uses: codecov/codecov-action@v5
+        with:
+          files: coverage/lcov.info
+          fail_ci_if_error: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  # Promote tested code: fast-forward the `release` branch to this commit.
+  # The intranet VM auto-deploys whatever `release` points at (builds locally —
+  # no images or artifacts are published anywhere). See docs/deployment.md.
+  # NOTE: do not add branch protection on `release`, or GITHUB_TOKEN pushes fail.
+  # Concurrent main pushes can race here; the older run's non-FF push is
+  # rejected by git — expected and harmless (newer commit already promoted).
+  promote:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - run: git push origin HEAD:release

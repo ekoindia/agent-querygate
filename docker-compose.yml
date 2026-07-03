@@ -1,0 +1,48 @@
+# Self-contained stack: the gateway + its admin/backing MySQL.
+# Target databases the gateway *queries* live elsewhere — only the admin DB is here.
+# Secrets come from a .env file next to this file (copy .env.docker.example).
+services:
+  db:
+    image: mysql:8
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_DATABASE: querygate_admin
+      MYSQL_USER: querygate
+      MYSQL_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      - querygate-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    # Always built from source (`docker compose up -d --build`) — locally and on
+    # the deploy VM (deploy/update.sh). No registry involved.
+    image: querygate:local
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      ADMIN_DB_HOST: db
+      ADMIN_DB_PORT: 3306
+      ADMIN_DB_NAME: querygate_admin
+      ADMIN_DB_USER: querygate
+      ADMIN_DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY in .env}
+      # Must include every browser origin that calls the API (admin dashboard).
+      # Same-origin SPA served on :3000 works with the default; add your real
+      # public/proxy origin(s) when fronting with TLS or a different domain.
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+
+volumes:
+  querygate-data:
