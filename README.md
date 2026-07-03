@@ -5,6 +5,7 @@ A security broker between AI agents and MySQL databases. Provides policy-based g
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Node](https://img.shields.io/badge/Node-20+-brightgreen)
+[![codecov](https://codecov.io/gh/anthropics/agent-querygate/branch/main/graph/badge.svg)](https://codecov.io/gh/anthropics/agent-querygate)
 
 ---
 
